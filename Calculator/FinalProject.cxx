@@ -20,6 +20,19 @@
 #include <vtkTransform.h>
 #include <vtkAxesActor.h>
 
+
+// added this For the spine
+#include <vtkOutlineFilter.h>
+#include <vtkCamera.h>
+#include <vtkProperty.h>
+#include <vtkMarchingCubes.h>
+#include <vtkImageFlip.h>
+
+// added this for the points
+#include <vtkVertexGlyphFilter.h>
+#include <vtkPointData.h>
+
+
 #include "lib/scCalc.hh"
 #include "lib/Registration.hh"
 #include "lib/RegionGrowingNoThreshold.h"
@@ -27,6 +40,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <dirent.h>
+
+#include "itkFlipImageFilter.h"
 
 using namespace std;
 
@@ -36,6 +51,7 @@ using namespace std;
 double seedX, seedY, seedZ;
 bool useDatabase = false;
 bool fitOnly = false;
+bool useAnnotations = false;
 bool newFile1 = true;
 bool newFile2 = true;
 //Helper funcion, ignore this
@@ -82,6 +98,108 @@ vtkSmartPointer<vtkActor> makeLine(double data[][3], unsigned length, double col
   return actor;
 }
 
+// added this - for the spine
+vtkSmartPointer<vtkActor> makeSpine(char filename[]) {
+  // read the image
+  vtkSmartPointer<vtkMetaImageReader> reader =
+    vtkSmartPointer<vtkMetaImageReader>::New();
+  reader->SetFileName (filename);
+
+  vtkSmartPointer<vtkMarchingCubes> skinExtractor =
+    vtkSmartPointer<vtkMarchingCubes>::New();
+  skinExtractor->SetInputConnection(reader->GetOutputPort());
+  skinExtractor->SetValue(0, 800);
+
+  vtkSmartPointer<vtkPolyDataMapper> skinMapper =
+    vtkSmartPointer<vtkPolyDataMapper>::New();
+  skinMapper->SetInputConnection(skinExtractor->GetOutputPort());
+  skinMapper->ScalarVisibilityOff();
+
+  vtkSmartPointer<vtkActor> skin =
+    vtkSmartPointer<vtkActor>::New();
+  skin->SetMapper(skinMapper);
+  skin->GetProperty()->SetDiffuseColor(1, 1, .9412);
+  skin->GetProperty()->SetOpacity(.5);
+
+  return skin;
+}
+
+// added this:
+vtkSmartPointer<vtkActor> drawPoints(std::vector<std::vector<int>> centroids, double* spacing) {
+
+  vtkSmartPointer<vtkPoints> points =
+    vtkSmartPointer<vtkPoints>::New();
+  unsigned length = centroids.size();
+  for (unsigned i = 0; i < length; ++i)
+  {
+      points->InsertNextPoint(double(centroids[i][0] * spacing[0]), double(centroids[i][1] * spacing[1]), double(centroids[i][2] * spacing[2]));
+  }
+
+  /*points->InsertNextPoint (0.0, 0.0, 0.0);
+  points->InsertNextPoint (1.0, 0.0, 0.0);
+  points->InsertNextPoint (0.0, 1.0, 0.0);*/
+ 
+  vtkSmartPointer<vtkPolyData> pointsPolydata =
+    vtkSmartPointer<vtkPolyData>::New();
+ 
+  pointsPolydata->SetPoints(points);
+ 
+  vtkSmartPointer<vtkVertexGlyphFilter> vertexFilter =
+    vtkSmartPointer<vtkVertexGlyphFilter>::New();
+#if VTK_MAJOR_VERSION <= 5
+  vertexFilter->SetInputConnection(pointsPolydata->GetProducerPort());
+#else
+  vertexFilter->SetInputData(pointsPolydata);
+#endif
+  vertexFilter->Update();
+ 
+  vtkSmartPointer<vtkPolyData> polydata =
+    vtkSmartPointer<vtkPolyData>::New();
+  polydata->ShallowCopy(vertexFilter->GetOutput());
+ 
+  // Setup colors
+  unsigned char red[3] = {255, 0, 0};
+  unsigned char green[3] = {0, 255, 0};
+  unsigned char blue[3] = {0, 0, 255};
+ 
+  vtkSmartPointer<vtkUnsignedCharArray> colors =
+    vtkSmartPointer<vtkUnsignedCharArray>::New();
+  colors->SetNumberOfComponents(3);
+  colors->SetName ("Colors");
+  for (unsigned i = 0; i < length; ++i)
+  {
+      switch (i%3) {
+        case 0:
+          colors->InsertNextTupleValue(red);
+          break;
+        case 1:
+          colors->InsertNextTupleValue(green);
+          break;
+        case 2:
+          colors->InsertNextTupleValue(blue);
+          break;
+        default:
+          colors->InsertNextTupleValue(red);
+      }
+  }
+  polydata->GetPointData()->SetScalars(colors);
+ 
+  // Visualization
+  vtkSmartPointer<vtkPolyDataMapper> mapper =
+    vtkSmartPointer<vtkPolyDataMapper>::New();
+#if VTK_MAJOR_VERSION <= 5
+  mapper->SetInputConnection(polydata->GetProducerPort());
+#else
+  mapper->SetInputData(polydata);
+#endif
+ 
+  vtkSmartPointer<vtkActor> actor =
+    vtkSmartPointer<vtkActor>::New();
+  actor->SetMapper(mapper);
+  actor->GetProperty()->SetPointSize(5);
+ 
+  return actor;
+}
 //mouse event handler
 class MouseInteractorStyle3 : public vtkInteractorStyleTrackballCamera
 {
@@ -105,20 +223,20 @@ int main(int argc, char *argv[])
 {
   ScCalc *calculator = new ScCalc();
   double* spacing1;
-  double* spacing2;
+
   //SEED INPUT GUI
   //TODO: Ken, your class should go here
   //The output should be a double[3]
-  if(argc < 3)
+  if(argc < 2)
   {
     std::cerr << "Usage: " << argv[0] << " InputFile1\n" << "InputFile2\n";
     return EXIT_FAILURE;
   }
 
   //Hidden parameter -d allows the program to use pre-calculated data
-  if(argc > 3)
+  if(argc > 2)
   {
-    for (int i = 3; i < argc; i++)
+    for (int i = 2; i < argc; i++)
     {
       if (strcmp(argv[i], "-d") == 0)
       {
@@ -130,6 +248,10 @@ int main(int argc, char *argv[])
         fitOnly = true;
         std::cout << "-f Show fit Only" <<endl;
       }
+      if (strcmp(argv[i], "-a") == 0) {
+        useAnnotations = true;
+        std::cout << "-a Using the lml file annotation in the directory" << endl;
+      }
     }
   }
 
@@ -140,13 +262,26 @@ int main(int argc, char *argv[])
   reader->Update();
   spacing1 = reader->GetPixelSpacing();
 
+  vtkSmartPointer<vtkImageReslice> reslice = vtkSmartPointer<vtkImageReslice>::New();
+  //reslice->SetOutputExtent(0, 9, 0, 100, 0, 0);
+  reslice->SetOutputSpacing(1,1,spacing1[2]);
+  reslice->SetInputConnection(reader->GetOutputPort());
+  reslice->Update();
+
   //display
   vtkSmartPointer<vtkResliceImageViewer> imageViewer =
   vtkSmartPointer<vtkResliceImageViewer>::New();
   vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor2 = 
   vtkSmartPointer<vtkRenderWindowInteractor>::New();
-  imageViewer->SetInputConnection(reader->GetOutputPort());
-  
+
+  // added this
+  vtkSmartPointer<vtkImageFlip> flipXFilter = vtkSmartPointer<vtkImageFlip>::New();
+  flipXFilter->SetFilteredAxis(1); // flip y axis
+  flipXFilter->SetInputConnection(reslice->GetOutputPort()); 
+  flipXFilter->Update();
+
+  imageViewer->SetResliceModeToAxisAligned();
+  imageViewer->SetInputConnection(flipXFilter->GetOutputPort());
   imageViewer->SetupInteractor(renderWindowInteractor2);
   imageViewer->SetColorLevel(500);
   imageViewer->SetColorWindow(2000);
@@ -154,9 +289,10 @@ int main(int argc, char *argv[])
   //set z coord always the most center slice 
   seedZ = (imageViewer->GetSliceMax())/2;
 
-  //imageViewer->SetSize(512,512);
+  imageViewer->SetSize(reader->GetWidth(), reader->GetHeight());
   imageViewer->SetSlice(seedZ);
-  imageViewer->SetSliceOrientationToXY();
+  //imageViewer->SetSliceOrientationToXY();
+  imageViewer->SetSliceOrientationToXZ();
   imageViewer->Render();
 
   seedZ = imageViewer->GetSlice();
@@ -173,51 +309,11 @@ int main(int argc, char *argv[])
   double seed1[3] = {seedX, seedY, seedZ};
 
   std::cout << "Seed1 Set at: " << seed1[0] <<" "<< seed1[1] <<" "<<seed1[2] <<endl;
-
-  //////////////////////////////////////////////////////////////////////
-
-  //read input mhd file
-  vtkSmartPointer<vtkMetaImageReader>reader1 =
-  vtkSmartPointer<vtkMetaImageReader>::New();
-  reader1->SetFileName(argv[2]);
-  reader1->Update();
-  spacing2 = reader1->GetPixelSpacing();
-
-  //display
-  vtkSmartPointer<vtkResliceImageViewer> imageViewer1 =
-  vtkSmartPointer<vtkResliceImageViewer>::New();
-  vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor3 = 
-  vtkSmartPointer<vtkRenderWindowInteractor>::New();
-
-  imageViewer1->SetInputConnection(reader1->GetOutputPort());
-  imageViewer1->SetupInteractor(renderWindowInteractor3);
-  imageViewer1->SetColorLevel(500);
-  imageViewer1->SetColorWindow(2000);
-
-  //set z coord always the most center slice 
-  seedZ = (imageViewer1->GetSliceMax())/2;
-
-  imageViewer1->SetSlice(seedZ);
-  imageViewer1->SetSliceOrientationToXY();
-  imageViewer1->Render();
-
-  vtkSmartPointer<MouseInteractorStyle3> style1 =
-  vtkSmartPointer<MouseInteractorStyle3>::New();
- 
-  renderWindowInteractor3->SetInteractorStyle(style1);
-  renderWindowInteractor3->Start();
-
-  seedZ = imageViewer1->GetSlice();
   
-  double seed2[3] = {seedX, seedY, seedZ};
-
-  std::cout << "Seed2 Set at: " << seed2[0] <<" "<< seed2[1] <<" "<<seed2[2] <<endl;
-
   ////////////////////////////////////////////////////////////////////////////////////////////
   
   //debug log
-  std::cout << "Spacing1 Set at: " << spacing1[0] << " " << spacing1[1] << " " << spacing1[2] <<endl;
-  std::cout << "Spacing2 Set at: " << spacing2[0] << " " << spacing2[1] << " " << spacing2[2] <<endl;
+  std::cout << "Spacing Set at: " << spacing1[0] << " " << spacing1[1] << " " << spacing1[2] <<endl;
 
   //Check if files are in database
   DIR* dataFolder;
@@ -227,7 +323,7 @@ int main(int argc, char *argv[])
   {
     if (stat("preComputedData", &st) == -1) 
     {
-      mkdir("preComputedData", 0700);
+      mkdir("preComputedData", 0777);
     }
 
     dataFolder = opendir("preComputedData");
@@ -240,19 +336,12 @@ int main(int argc, char *argv[])
         newFile1 = false;
         std::cout << "File 1: " << argv[1] << " found in database." << endl;
       }
-
-      if (strcmp(argv[2], ent->d_name) == 0) 
-      {
-        newFile2 = false;
-        std::cout << "File 2: " << argv[2] << " found in database." << endl;
-      }
     } 
 
   }
 
   //SEGMENTATION
   std::vector<std::vector<int>> centroids1;
-  std::vector<std::vector<int>> centroids2;
   RegionGrowingNoThreshold region_growing;
 
   char* fullName1;
@@ -260,16 +349,18 @@ int main(int argc, char *argv[])
   strcpy(fullName1, "./preComputedData/");
   strcat(fullName1, argv[1]);
 
-  char* fullName2;
-  fullName2 = (char*)malloc(strlen(argv[2]) + 18 + 1);
-  strcpy(fullName2, "./preComputedData/");
-  strcat(fullName2, argv[2]);
-
+  calculator->spacing1 = spacing1;
   if (useDatabase && !newFile1)
   {
     //Load from database
     centroids1 = calculator->loadVector(fullName1);
     std::cout << "IMAGE1 LOADED FROM DATABASE..." <<endl;
+  }
+  else if (useAnnotations) {
+    // Use the centroids from the annotation information instead of performing segmentation.
+    // read the lml file.
+    centroids1 = calculator->loadAnnotationData(argv[1]);
+    std::cout << "LOADING CENTROIDS from .lml file" << endl;
   }
   else
   {
@@ -277,30 +368,11 @@ int main(int argc, char *argv[])
     std::cout << "CALCULATING SEGMENTATION IMAGE1..." <<endl;
     centroids1 = region_growing.GetCentroids(argv[1], seed1[0], seed1[1], seed1[2]);
     std::cout << "IMAGE1 SEGMENTATION COMPLETE" <<endl;
-
+    std::cout << "Writing out Image1 with centroids" << endl;
+    //region_growing.WriteImageWithCentroids(argv[1], "/tmp/results/output1.mhd", centroids1);
     if (useDatabase)
     {
       calculator->saveVector(centroids1, fullName1);
-    }
-  }
-
-
-  if (useDatabase && !newFile2)
-  {
-    //Load from database
-    centroids2 = calculator->loadVector(fullName2);
-    std::cout << "IMAGE2 LOADED FROM DATABASE..." <<endl;
-  }
-  else
-  {
-    //Calculate fresh
-    std::cout << "CALCULATING SEGMENTATION IMAGE2..." <<endl;
-    centroids2 = region_growing.GetCentroids(argv[2], seed2[0], seed2[1], seed2[2]);
-    std::cout << "IMAGE2 SEGMENTATION COMPLETE" <<endl;
-
-    if (useDatabase)
-    {
-      calculator->saveVector(centroids2, fullName2);
     }
   }
 
@@ -342,16 +414,13 @@ int main(int argc, char *argv[])
   //FINAL RESULT CALCULATION
   //TODO: Juris will need to improve this to produce reasonable results
   calculator->spacing1 = spacing1;
-  calculator->spacing2 = spacing2;
   calculator->loadSpine1(centroids1);
-  calculator->loadSpine2(centroids2);
   //calculator->printSpine1();
  // calculator->loadTransofrm(trans);
   //calculator->printTransform();
   //calculator->transformSpine1();
  //calculator->printSpine1();
   calculator->crateSpineFit(1);
-  calculator->crateSpineFit(2);
   calculator->printAngles();
   // calculator->multidimfit();
 
@@ -378,12 +447,22 @@ int main(int argc, char *argv[])
  
   // the actual text of the axis label can be changed:
   // axes->SetXAxisLabelText("test");
-  axes->SetTotalLength(100,100,100);
+  axes->SetTotalLength(50,50,50);
   axes->AxisLabelsOff();
 
+  // added this
+  vtkSmartPointer<vtkCamera> camera =  vtkSmartPointer<vtkCamera>::New();
+  camera->SetPosition(0, 0, 100);
+  camera->SetFocalPoint(0, 0, 0);
+  camera->Roll(90.0);
+  camera->Pitch(90.0);
+  std::cout<<"The current viewup is " << *(camera->GetViewUp());
   // Setup render window, renderer, and interactor
   vtkSmartPointer<vtkRenderer> renderer =
   vtkSmartPointer<vtkRenderer>::New();
+
+  // setup the camera
+  renderer->SetActiveCamera(camera);
   vtkSmartPointer<vtkRenderWindow> renderWindow =
   vtkSmartPointer<vtkRenderWindow>::New();
   renderWindow->AddRenderer(renderer);
@@ -393,13 +472,14 @@ int main(int argc, char *argv[])
   renderer->AddActor(axes);
   if (!fitOnly)
   {
+    // red curve
   	renderer->AddActor(makeLine(calculator->spine1,calculator->spine1Length,color1));
-  	renderer->AddActor(makeLine(calculator->spine2,calculator->spine2Length,color2));
   } else {colorA = color1; colorB = color2;}
 
+  // blue curve
   renderer->AddActor(makeLine(calculator->fit1,calculator->spine1Length,colorA));
-  renderer->AddActor(makeLine(calculator->fit2,calculator->spine2Length,colorB));
-
+  renderer->AddActor(makeSpine(argv[1]));
+  renderer->AddActor(drawPoints(centroids1, spacing1));
   //Ouput final view
   renderWindow->Render();
   renderWindowInteractor->Start();

@@ -29,6 +29,12 @@
 #include <stdbool.h>
 #include <math.h>
 
+struct SpineComponent {
+  int index1;
+  int index2;
+  double angle;
+};
+
 //Spine Curvature Calculator
 class ScCalc
 {
@@ -43,22 +49,13 @@ public:
     double* spacing1;
     double* angles1;
 
-    std::vector<std::vector<int> > spine2vec;
-    double (*spine2)[3];
-    double (*fit2)[3];
-    unsigned spine2Length;
-    double* spacing2;
-    double* angles2;
-
     // TRandom* gRandom;
-    
+    void getGeometricCurvature(double points[][3], unsigned spLength, unsigned order, double *xStore, double *yStore, double *dz);
     void printVector(std::vector<std::vector<int> > vec);
     void saveVector(std::vector<std::vector<int> > vec, char* fileName);
     std::vector<std::vector<int> > loadVector(char* fileName);
     void loadSpine1(double spine[][3], unsigned length);
-    void loadSpine2(double spine[][3], unsigned length);
     void loadSpine1(std::vector<std::vector<int>> spine);
-    void loadSpine2(std::vector<std::vector<int>> spine);
     void loadTransofrm(double matrix[4][4]);
     void transformSpine1();
     void compareSpines();
@@ -83,9 +80,15 @@ public:
     void anglesY(double points[][3], double angles[], int npoints);
     void maXanglesX(double points[][3], double angles[], int npoints);
     void getMax3Dangles(double points[][3], double angles[], int npoints);
+
     // Int_t multidimfit(bool doFit = true);
     // int CompareResults(TMultiDimFit *fit, bool doFit);
     // void makeData(Double_t* x, Double_t& d, Double_t& e);
+
+    // added this
+    std::vector<std::vector<int>> loadAnnotationData(char* fileName);
+    std::vector<SpineComponent> getMax3DanglesMod(double points[][3], double angles[], int npoints);
+    void analyze3DAngles(std::vector<SpineComponent> comp);
 };
 
 #endif

@@ -276,6 +276,7 @@ void RegionGrowingNoThreshold::ComputePerSliceAvgAndDev(InternalImageType::Point
 
 std::vector<std::vector<int>> RegionGrowingNoThreshold::ComputeCentroids(
   InternalImageType::Pointer& image, double* max_image_x_dist_ratio,
+
   double* max_image_y_dist_ratio, double* max_image_z_dist_ratio, bool final) {
   std::vector<std::vector<int>> centroids;
   InternalImageType::RegionType region = image->GetLargestPossibleRegion();
@@ -326,6 +327,11 @@ std::vector<std::vector<int>> RegionGrowingNoThreshold::ComputeCentroids(
         coord.push_back(y_sum / num);
         coord.push_back(z);
         centroids.push_back(coord);
+
+        // added this
+        /*std::cout<<"Centroids: ";
+        for(int i=0; i<coord.size(); ++i)
+          std::cout << coord[i] << ' ';*/
       }
   }
 
@@ -339,6 +345,55 @@ std::vector<std::vector<int>> RegionGrowingNoThreshold::ComputeCentroids(
   return centroids;
 }
 
+void RegionGrowingNoThreshold::WriteImageWithCentroids(char filename[], char outfilename[], std::vector<std::vector<int>> centroids) {
+  typedef  itk::ImageFileReader< InternalImageType > ReaderType;  
+  ReaderType::Pointer reader = ReaderType::New();
+  reader->SetFileName( filename );
+  reader->Update();  
+  InternalImageType::Pointer imageWithCentroids = InternalImageType::New();
+  imageWithCentroids = reader->GetOutput();
+
+  std::cout << "Number of centroids = " << centroids.size();
+  for(int i=0; i<centroids.size(); i++) {
+    InternalImageType::IndexType myIndex;
+    myIndex[0] = centroids[i][0];
+    myIndex[1] = centroids[i][1];
+    myIndex[2] = centroids[i][2];
+    imageWithCentroids->SetPixel(myIndex, 5000);
+
+    myIndex[0] = centroids[i][0]-1;
+    myIndex[1] = centroids[i][1];
+    myIndex[2] = centroids[i][2];
+    imageWithCentroids->SetPixel(myIndex, 5000);
+
+    myIndex[0] = centroids[i][0]+1;
+    myIndex[1] = centroids[i][1];
+    myIndex[2] = centroids[i][2];
+    imageWithCentroids->SetPixel(myIndex, 5000);
+
+    myIndex[0] = centroids[i][0];
+    myIndex[1] = centroids[i][1]-1;
+    myIndex[2] = centroids[i][2];
+    imageWithCentroids->SetPixel(myIndex, 5000);
+
+
+    myIndex[0] = centroids[i][0];
+    myIndex[1] = centroids[i][1]+1;
+    myIndex[2] = centroids[i][2];
+
+    imageWithCentroids->SetPixel(myIndex, 5000);
+    std::cout<<"(" << centroids[i][0];
+    std::cout<<", " << centroids[i][1];
+    std::cout<<", " <<centroids[i][2] <<") ";
+  }
+  typedef  itk::ImageFileWriter<InternalImageType> WriterType;
+  WriterType::Pointer writer = WriterType::New();
+  writer->SetFileName(outfilename);
+  writer->SetInput(imageWithCentroids);
+  writer->Update();
+  std::cout<<"Written out the file";
+}
+
 std::vector<std::vector<int>> RegionGrowingNoThreshold::GetCentroids(char filename[], int seed_x, int seed_y, int seed_z) {
   typedef  itk::ImageFileReader< InternalImageType > ReaderType;
   //typedef itk::CastImageFilter< InternalImageType, OutputImageType >
@@ -348,7 +403,7 @@ std::vector<std::vector<int>> RegionGrowingNoThreshold::GetCentroids(char filena
   //CastingFilterType::Pointer caster = CastingFilterType::New();
 
   reader->SetFileName( filename );
-
+  reader->Update();
   // Smoothing the image before appplying the region growing.
   typedef itk::CurvatureAnisotropicDiffusionImageFilter< InternalImageType, InternalImageType >
      CurvatureAnisotropicDiffusionImageFilterType;
@@ -365,6 +420,22 @@ std::vector<std::vector<int>> RegionGrowingNoThreshold::GetCentroids(char filena
 
   typedef itk::SubtractImageFilter<InternalImageType> SubtractImageFilterType;
   SubtractImageFilterType::Pointer diff = SubtractImageFilterType::New();
+
+  // added this: 
+  // write out the image
+  /*InternalImageType::Pointer imageWithCentroids = InternalImageType::New();
+  imageWithCentroids = reader->GetOutput();
+  InternalImageType::IndexType myIndex;
+  myIndex[0] = 10;
+  myIndex[1] = 10;
+  myIndex[2] = 100;
+  imageWithCentroids->SetPixel(myIndex, 5000);
+  typedef  itk::ImageFileWriter<InternalImageType> WriterType;
+  WriterType::Pointer writer = WriterType::New();
+  writer->SetFileName("/tmp/output1.mhd");
+  writer->SetInput(imageWithCentroids);
+  writer->Update();
+  std::cout<<"Written out the file";*/
 
   smoothing->SetInput(reader->GetOutput());
   laplacian->SetInput(smoothing->GetOutput());
@@ -397,6 +468,7 @@ std::vector<std::vector<int>> RegionGrowingNoThreshold::GetCentroids(char filena
   long long k_max = 0;
   double z_max = 0;
 
+  std::cout << "The SEED being used is " << index[0] << " " << index[1] << " " << index[2] << std::endl;
   // Going over all neibghorhood if the seed and trying each of them as the
   // seed, at the same time ,we make sure that we did not do oversegmentation
   // and that the length of the spine is not too short.
@@ -474,6 +546,12 @@ std::vector<std::vector<int>> RegionGrowingNoThreshold::GetCentroids(char filena
   //writer->Update();
 
   image = connectedThreshold->GetOutput();
+   typedef  itk::ImageFileWriter<  OutputImageType  > WriterType;
+  WriterType::Pointer writer1 = WriterType::New();
+  writer1->SetInput(image);
+  writer1->SetFileName("/tmp/intermediate.mhd");
+  writer1->Update();
+  std::cout << "Written out the intermediate volume" << std::endl;
   return ComputeCentroids(image, &max_image_x_dist_ratio, &max_image_y_dist_ratio,
     &max_image_z_dist_ratio, true);
 }

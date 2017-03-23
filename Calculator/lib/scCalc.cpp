@@ -1,6 +1,10 @@
 #include "scCalc.hh" 
+#include <map>
+#include <algorithm>
 
 using namespace std;
+
+
 
 void ScCalc::printVector(vector<vector<int> > vec)
 {
@@ -64,43 +68,22 @@ void ScCalc::loadSpine1(vector<vector<int>> spine)
 {
     unsigned length = spine.size();
     double (*newSpine)[3] = new double[length][3];
-
     for (unsigned i = 0; i < length; ++i)
     {
         for (unsigned j = 0; j < 3; ++j)
         {
             newSpine[i][j] = spacing1[j] * spine[i][j];
-        }
+         }
     }
 
     spine1 = newSpine; 
     spine1Length = length;
 }
 
-void ScCalc::loadSpine2(vector<vector<int>> spine)
-{
-    unsigned length = spine.size();
-    double (*newSpine)[3] = new double[length][3];
-
-    for (unsigned i = 0; i < length; ++i)
-    {
-        for (unsigned j = 0; j < 3; ++j)
-        {
-            newSpine[i][j] = spacing2[j] * spine[i][j];
-        }
-    }
-    
-    spine2 = newSpine; 
-    spine2Length = length;
-}
 
 void ScCalc::loadSpine1(double spine[][3], unsigned length)
 {
     loadSpineX(spine, length, 0);
-}
-void ScCalc::loadSpine2(double spine[][3], unsigned length)
-{
-    loadSpineX(spine, length, 1);
 }
 
 void ScCalc::loadSpineX(double spine[][3], unsigned length, unsigned spineNumber)
@@ -109,7 +92,6 @@ void ScCalc::loadSpineX(double spine[][3], unsigned length, unsigned spineNumber
     double* spacing;
 
     if (!spineNumber) spacing = spacing1;
-    else spacing = spacing2;
 
     for (unsigned i = 0; i < length; ++i)
     {
@@ -120,7 +102,6 @@ void ScCalc::loadSpineX(double spine[][3], unsigned length, unsigned spineNumber
     }
 
     if (!spineNumber) {spine1 = newSpine; spine1Length = length;}
-    else {spine2 = newSpine; spine2Length = length;}
 }
 
 void ScCalc::loadTransofrm(double matrix[][4])
@@ -210,30 +191,22 @@ void ScCalc::printAngles()
     cout << "= Spine Curvature Summary (Degrees)   =" << endl;
     cout << "=======================================" << endl;
     double max1 = 0;
-    double max2 = 0;
 
     unsigned length;
-    if (spine1Length > spine2Length)
-        length = spine1Length;
-    else
-        length = spine2Length;
-
+    length = spine1Length;
+    int counter = 0;
     for (unsigned i = 0; i < length - 3; ++i)
     {
+        cout << ++counter <<" ";
         if (i < spine1Length - 3) 
         {
             cout << "Spine1: " << angles1[i] << ", ";
             if (angles1[i] > max1) max1 = angles1[i];
         } else cout << "               ";
-        if (i < spine2Length - 3)
-        {
-            cout << "Spine2: " << angles2[i];
-            if (angles2[i] > max2) max2 = angles2[i];
-        }
         cout << endl;
     }
     cout << "=======================================" << endl;
-    cout << "Spine1 MAX: " << max1 << " Spine2 MAX: " << max2 << endl;
+    cout << "Spine1 MAX: " << max1 << endl;
 }
 
 double ScCalc::firstDerivative(double a[5])
@@ -343,13 +316,70 @@ double ScCalc::curveSecDerivative(double points[9][3])
 //     return std::vector<T>( oXtYMatrix.data().begin(), oXtYMatrix.data().end() );
 // }
 
+// added this
+void ScCalc::getGeometricCurvature(double points[][3], unsigned spLength, unsigned order, double *xStore, double *yStore, double *dz) {
+    // we have the coefficients. Compute the first derivative at the point
+    double (*fder)[3];
+    double (*sder)[3];
+    fder = new double[spLength][3];
+    sder = new double[spLength][3];
+    //double *kappa;
+    cout << "Calculating the geometric curvature !!! " << endl;
+    for (int i = 0; i < spLength; ++i) 
+    {
+        double sumX = 0;
+        double sumY = 0;
+        double sumZ = 0;
+        for (int j = order; j > 1; j--) 
+        {
+            sumX += (j * xStore[j]) * pow(dz[i], j-1);
+            sumY += (j * yStore[j]) * pow(dz[i], j-1);
+        }
+
+        cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
+        fder[i][0] = sumX;
+        fder[i][1] = sumY;
+        fder[i][2] = dz[i]; // verify this
+    }
+
+    // calculate the second derivative
+    for (unsigned i = 0; i < spLength; ++i) 
+    {
+        double sumX = 0;
+        double sumY = 0;
+        double sumZ = 0;
+
+        for (unsigned j = order; j > 3; --j) 
+        {
+            sumX += (j * (j-1) * xStore[j]) * pow(dz[i], j-2);
+            sumY += (j * (j-1) * yStore[j]) * pow(dz[i], j-2);
+        }
+
+        cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
+        sder[i][0] = sumX;
+        sder[i][1] = sumY;
+        sder[i][2] = dz[i]; // verify this
+    }
+
+    // Calcuating the kappa value at each point
+     // calculate the second derivative
+    for (unsigned i = 0; i < spLength; ++i) 
+    {
+        cout << sqrt(pow((sder[i][2] * fder[i][1]) - (sder[i][1] * fder[i][2]), 2) +
+            pow((sder[i][0] * fder[i][2]) - (sder[i][2] * fder[i][0]), 2) + 
+            pow((sder[i][1] * fder[i][0]) - (sder[i][0] * fder[i][1]), 2)) /
+            pow(pow(fder[i][0], 2) + pow(fder[i][1], 2) + pow(fder[i][2], 2), 1.5);
+        cout << endl;
+    }   
+
+}
+
 void ScCalc::crateSpineFit(int spineNum, unsigned order)
 {
     double (*spine)[3];
     double (*fit)[3];
     unsigned spLength;
     double *maXanX;
-
     if (spineNum == 1) {
         spine = spine1;
         spLength = spine1Length;
@@ -357,22 +387,14 @@ void ScCalc::crateSpineFit(int spineNum, unsigned order)
         fit = fit1;
         angles1 = new double[spLength - 3];
         maXanX = angles1;
-    } else {
-        spine = spine2;
-        spLength = spine2Length;
-        fit2 = new double[spLength][3];
-        fit = fit2;
-        angles2 = new double[spLength - 3];
-        maXanX = angles2;
     }
-
     double *dx = new double[spLength];
     double *dy = new double[spLength];
     double *dz = new double[spLength];
 
     double *xStore = new double[order];
     double *yStore = new double[order];
-
+    cout << "The spine length is " << spLength;
     for (unsigned i = 0; i < spLength; ++i) 
     {
         dx[i] = spine[i][0];
@@ -380,9 +402,15 @@ void ScCalc::crateSpineFit(int spineNum, unsigned order)
         dz[i] = spine[i][2];
     }
 
-    polynomialfit(spLength, order, dz, dx, xStore);
+    //polynomialfit(spLength, order, dz, dx, xStore);
     polynomialfit(spLength, order, dz, dy, yStore);
-
+    xStore[0] = 0;
+    xStore[1] = 0;
+    xStore[2] = 0;
+    xStore[3] = 0;
+    xStore[4] = 0;
+    xStore[5] = 0;
+    xStore[6] = 0;
     cout << endl;
     cout << "Spine" << spineNum << " polynomial curve:" << endl;
     cout << endl;
@@ -418,9 +446,9 @@ void ScCalc::crateSpineFit(int spineNum, unsigned order)
 
     //anglesX(fit, anX, spLength);
     //anglesY(fit, anY, spLength);
-    getMax3Dangles(fit, maXanX, spLength);
+    getGeometricCurvature(fit, spLength, order, xStore, yStore, dz);
+    analyze3DAngles(getMax3DanglesMod(fit, maXanX, spLength));
 }
-
 
 bool ScCalc::polynomialfit(int obs, int degree, 
            double *dx, double *dy, double *store) /* n, p */
@@ -481,10 +509,107 @@ void ScCalc::getMax3Dangles(double points[][3], double angles[], int npoints)
             double mag2 = sqrt(vec2[0] * vec2[0] + vec2[1] * vec2[1] + vec2[2] * vec2[2]);
 
             double newAngle = acos(dotProduct / (mag1 * mag2)) * 180/3.1415926358979323;
-            if (newAngle > angles[i - 1]) angles[i - 1] = newAngle;
-            else break;
+            if (newAngle > angles[i - 1]) {
+               cout << "Max so far: " << i << " and " << j << " with angle " << newAngle << endl;
+              angles[i - 1] = newAngle;
+            }
+            else {
+                cout << "Broke: " << i << " and " << j << " with angle " << newAngle << endl;
+                break;
+            }
         }
     }
+}
+
+// added this
+// Finding the maxangles within the section. 
+// Compare with 3D angles and the 2D results with planar projections
+vector<SpineComponent> ScCalc::getMax3DanglesMod(double points[][3], double angles[], int npoints)
+{
+  map<int, map<int, double>> zAngleMap;
+  bool detectedInflection = false;
+  vector<SpineComponent> components;
+
+    for (int i = 1; i < npoints - 2; ++i) 
+    {
+        double *vec1 = new double[3];
+        for (int k = 0; k < 3; ++k) vec1[k] = points[i][k] - points[i-1][k];
+        angles[i - 1] = 0;
+        int j = 0;
+        double newAngle = 0.0;
+        for (j = i + 2; j < npoints; ++j)
+        {
+
+            double *vec2 = new double[3];
+            for (int k = 0; k < 3; ++k) vec2[k] = points[j][k] - points[j - 1][k];
+
+            double dotProduct = vec1[0] * vec2[0] + vec1[1] * vec2[1] + vec1[2] * vec2[2];
+            double mag1 = sqrt(vec1[0] * vec1[0] + vec1[1] * vec1[1] + vec1[2] * vec1[2]);
+            double mag2 = sqrt(vec2[0] * vec2[0] + vec2[1] * vec2[1] + vec2[2] * vec2[2]);
+
+            newAngle = acos(dotProduct / (mag1 * mag2)) * 180/3.1415926358979323;
+            if (newAngle > angles[i - 1]) {
+
+               cout << "Max so far: " << i << " and " << j << " with angle " << newAngle << endl;
+              angles[i - 1] = newAngle;
+              zAngleMap[i][j] = newAngle;
+            }
+            else {
+                cout << "Broke: " << i << " and " << j << " with angle " << newAngle << endl;
+                detectedInflection = true;
+                break;
+            }
+        }
+        if (!detectedInflection) {
+          zAngleMap[i][j-1] = newAngle;
+        }
+        detectedInflection = false;
+    }
+
+    // Print out the map to figure out what the extremes might be
+    for(auto it = zAngleMap.begin(); it != zAngleMap.end(); ++it) {
+      for(auto it1 = it->second.begin(); it1 != it->second.cend(); ++it1) {
+        std::cout << it->first-1 << " and " << it->first << "  " << it1->first-1 << " and "  << it1->first << " \tAngle: " << it1->second << "\n";
+        SpineComponent sp;
+        sp.index1 = it->first;
+        sp.index2 = it1->first;
+        sp.angle = it1->second;
+        components.push_back(sp);
+      }
+    }
+    return components;
+}
+
+bool compareByAngle(const SpineComponent &a, const SpineComponent &b) {
+    return a.angle > b.angle;
+}
+// added this
+void ScCalc::analyze3DAngles(std::vector<SpineComponent> comp) {
+  // find the largest angle - record the endpoints.
+  // sort the angles based on 
+  std::sort(comp.begin(), comp.end(), compareByAngle);
+  for(int i = 0; i < comp.size(); i++ ) {
+    std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+  }
+
+  // filter the results to print sectional results.
+  std::cout << "Printing out the final angles " << endl;
+  int deviation = 1;
+  std::vector<SpineComponent> results;
+  for(int i = 0; i < comp.size(); i++) {
+    // Check if the span is already covered by another curve
+    bool includeInResults = true;
+    for (int j = 0; j < results.size(); j++) {
+      if (comp[i].index1 >= results[j].index1-deviation && comp[i].index2 <= results[j].index2+deviation) {
+        includeInResults = false;
+        break;
+      }
+    }
+    if (includeInResults == true) {
+      results.push_back(comp[i]);
+      std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+    }
+  }
 }
 
 void ScCalc::maXanglesX(double points[][3], double angles[], int npoints){
@@ -541,6 +666,56 @@ for(int i = 0; i < npoints; i++){
     angles[i] = (180 + theta1 - theta2 + 360);
     while(angles[i]>360)angles[i]-=360;
 } }
+
+// added this:
+vector<vector<int>> ScCalc::loadAnnotationData(char* fileName)
+{
+    FILE *fp;
+    vector<vector<int> > vec;
+
+    string sFileName = fileName;
+
+    size_t lastdot = sFileName.find_last_of(".");
+
+    if (lastdot != std::string::npos) {
+        sFileName = sFileName.substr(0, lastdot);
+    }
+    sFileName.append(".lml");
+
+    std::cout << "The .lml file name is " << sFileName << endl;
+    ifstream fileStream(sFileName);
+    if (!fileStream.is_open())
+    {
+        cout << "Exiting unable to open file " << fileName << endl;
+    }
+    int counter = 0;
+    string line;
+    int spacingIndex = 0;
+    while(getline(fileStream, line, '\n')) {
+        if (counter == 0) {
+            counter ++;
+            continue;
+        }
+        stringstream ss(line);
+        vector<int> numbers;
+        string in_line;
+        int col = 0;
+        while((getline (ss, in_line, '\t') || getline(ss, in_line, '\n')) && col <=4 ) 
+        {
+          if (col != 0 && col != 1) {
+            int i = stoi(in_line, 0);
+            i = i/spacing1[spacingIndex%3];
+            numbers.push_back(i);;
+            spacingIndex++;
+          }
+          col ++;
+        }
+        if (numbers.size() > 0)
+          vec.push_back(numbers);
+    }
+
+    return vec;
+}
 
 // //____________________________________________________________________
 // void ScCalc::makeData(Double_t* x, Double_t& d, Double_t& e)

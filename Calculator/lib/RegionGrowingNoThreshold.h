@@ -36,6 +36,7 @@ typedef itk::Image< OutputPixelType, Dimension > OutputImageType;
 class RegionGrowingNoThreshold {
  public:
   std::vector<std::vector<int>> GetCentroids(char filename[], int seed_x, int seed_y, int seed_z);
+  void WriteImageWithCentroids(char filename[], char outfilename[], std::vector<std::vector<int>> centroids);
  protected:
   void ComputeStats(InternalImageType::Pointer& image,
                     std::unordered_map<long long, InternalImageType::IndexType>& region_points,

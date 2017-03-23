@@ -658,8 +658,8 @@ void Registration::affineAlign(string fixedImageInput, string movingImageInput,
     registration->SetFixedImageRegion(fixedImageReader->GetOutput()->GetBufferedRegion());
 
     // Get & print useful statistics about the input images
-    fixedImageReader->GenerateOutputInformation();
-    movingImageReader->GenerateOutputInformation();
+    //fixedImageReader->GenerateOutputInformation();
+    //movingImageReader->GenerateOutputInformation();
     FixedImageType::SizeType fixedImageSize;
     MovingImageType::SizeType movingImageSize;
     fixedImageSize = fixedImageReader->GetOutput()->GetLargestPossibleRegion().GetSize();
