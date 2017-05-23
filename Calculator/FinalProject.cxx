@@ -32,6 +32,15 @@
 #include <vtkVertexGlyphFilter.h>
 #include <vtkPointData.h>
 
+// testing this
+#include <vtkImageData.h>
+#include <vtkPNGWriter.h>
+#include <vtkSmartPointer.h>
+#include <vtkImageCanvasSource2D.h>
+#include <vtkImageCast.h>
+#include <vtkTextActor.h>
+#include <vtkTextProperty.h>
+// finished testing this
 
 #include "lib/scCalc.hh"
 #include "lib/Registration.hh"
@@ -52,6 +61,7 @@ double seedX, seedY, seedZ;
 bool useDatabase = false;
 bool fitOnly = false;
 bool useAnnotations = false;
+bool useComponents = false;
 bool newFile1 = true;
 bool newFile2 = true;
 //Helper funcion, ignore this
@@ -124,8 +134,9 @@ vtkSmartPointer<vtkActor> makeSpine(char filename[]) {
   return skin;
 }
 
+
 // added this:
-vtkSmartPointer<vtkActor> drawPoints(std::vector<std::vector<int>> centroids, double* spacing) {
+vtkSmartPointer<vtkActor> drawPoints(std::vector<std::vector<int>> centroids, double* spacing, std::vector<std::string> vertebraePoints) {
 
   vtkSmartPointer<vtkPoints> points =
     vtkSmartPointer<vtkPoints>::New();
@@ -161,26 +172,49 @@ vtkSmartPointer<vtkActor> drawPoints(std::vector<std::vector<int>> centroids, do
   unsigned char red[3] = {255, 0, 0};
   unsigned char green[3] = {0, 255, 0};
   unsigned char blue[3] = {0, 0, 255};
- 
+  unsigned char cyan[3] = {0, 255, 255};
   vtkSmartPointer<vtkUnsignedCharArray> colors =
     vtkSmartPointer<vtkUnsignedCharArray>::New();
   colors->SetNumberOfComponents(3);
   colors->SetName ("Colors");
-  for (unsigned i = 0; i < length; ++i)
-  {
-      switch (i%3) {
-        case 0:
+
+  if (vertebraePoints.size() > 0) {
+    for (unsigned i = 0; i < length; ++i)
+    {
+        if (vertebraePoints[i].at(0) == 'C') {
+          colors->InsertNextTupleValue(cyan);
+        }
+        else if (vertebraePoints[i].at(0) == 'T') {
           colors->InsertNextTupleValue(red);
-          break;
-        case 1:
+        }
+        else if (vertebraePoints[i].at(0) == 'L') {
           colors->InsertNextTupleValue(green);
-          break;
-        case 2:
+        }
+        else if (vertebraePoints[i].at(0) == 'S'){
           colors->InsertNextTupleValue(blue);
-          break;
-        default:
-          colors->InsertNextTupleValue(red);
-      }
+        }
+        else {
+          colors->InsertNextTupleValue(red); // Default to red
+        }
+    }  
+  }
+  else {
+    for (unsigned i = 0; i < length; ++i)
+    {
+        switch (i%3) {
+          case 0:
+            colors->InsertNextTupleValue(red);
+            break;
+          case 1:
+            colors->InsertNextTupleValue(green);
+            break;
+          case 2:
+            colors->InsertNextTupleValue(blue);
+            break;
+          default:
+            colors->InsertNextTupleValue(red);
+        }
+    }
   }
   polydata->GetPointData()->SetScalars(colors);
  
@@ -200,6 +234,108 @@ vtkSmartPointer<vtkActor> drawPoints(std::vector<std::vector<int>> centroids, do
  
   return actor;
 }
+
+// added this:
+vtkSmartPointer<vtkActor> drawPointsDouble(double centroids[][3], double* spacing, int length, std::vector<std::string> vertebraePoints) {
+
+  vtkSmartPointer<vtkPoints> points =
+    vtkSmartPointer<vtkPoints>::New();
+
+  for (unsigned i = 0; i < length; ++i)
+  {
+      points->InsertNextPoint(centroids[i][0], centroids[i][1], centroids[i][2]);
+  }
+
+  /*points->InsertNextPoint (0.0, 0.0, 0.0);
+  points->InsertNextPoint (1.0, 0.0, 0.0);
+  points->InsertNextPoint (0.0, 1.0, 0.0);*/
+ 
+  vtkSmartPointer<vtkPolyData> pointsPolydata =
+    vtkSmartPointer<vtkPolyData>::New();
+ 
+  pointsPolydata->SetPoints(points);
+ 
+  vtkSmartPointer<vtkVertexGlyphFilter> vertexFilter =
+    vtkSmartPointer<vtkVertexGlyphFilter>::New();
+#if VTK_MAJOR_VERSION <= 5
+  vertexFilter->SetInputConnection(pointsPolydata->GetProducerPort());
+#else
+  vertexFilter->SetInputData(pointsPolydata);
+#endif
+  vertexFilter->Update();
+ 
+  vtkSmartPointer<vtkPolyData> polydata =
+    vtkSmartPointer<vtkPolyData>::New();
+  polydata->ShallowCopy(vertexFilter->GetOutput());
+ 
+  // Setup colors
+  unsigned char red[3] = {255, 0, 0};
+  unsigned char green[3] = {0, 255, 0};
+  unsigned char blue[3] = {0, 0, 255};
+  unsigned char cyan[3] = {0, 255, 255};
+
+  vtkSmartPointer<vtkUnsignedCharArray> colors =
+    vtkSmartPointer<vtkUnsignedCharArray>::New();
+  colors->SetNumberOfComponents(3);
+  colors->SetName ("Colors");
+  if (vertebraePoints.size() > 0) {
+    for (unsigned i = 0; i < length; ++i)
+    {
+        if (vertebraePoints[i].at(0) == 'C') {
+          colors->InsertNextTupleValue(cyan);
+        }
+        else if (vertebraePoints[i].at(0) == 'T') {
+          colors->InsertNextTupleValue(red);
+        }
+        else if (vertebraePoints[i].at(0) == 'L') {
+          colors->InsertNextTupleValue(green);
+        }
+        else if (vertebraePoints[i].at(0) == 'S'){
+          colors->InsertNextTupleValue(blue);
+        }
+        else {
+          colors->InsertNextTupleValue(red); // Default to red
+        }
+    }    
+  }
+  else {
+    for (unsigned i = 0; i < length; ++i)
+    {
+        switch (i%3) {
+          case 0:
+            colors->InsertNextTupleValue(red);
+            break;
+          case 1:
+            colors->InsertNextTupleValue(green);
+            break;
+          case 2:
+            colors->InsertNextTupleValue(blue);
+            break;
+          default:
+            colors->InsertNextTupleValue(red);
+        }
+    }
+  }
+  polydata->GetPointData()->SetScalars(colors);
+ 
+  // Visualization
+  vtkSmartPointer<vtkPolyDataMapper> mapper =
+    vtkSmartPointer<vtkPolyDataMapper>::New();
+#if VTK_MAJOR_VERSION <= 5
+  mapper->SetInputConnection(polydata->GetProducerPort());
+#else
+  mapper->SetInputData(polydata);
+#endif
+ 
+  vtkSmartPointer<vtkActor> actor =
+    vtkSmartPointer<vtkActor>::New();
+  actor->SetMapper(mapper);
+  actor->GetProperty()->SetPointSize(5);
+ 
+  return actor;
+}
+
+
 //mouse event handler
 class MouseInteractorStyle3 : public vtkInteractorStyleTrackballCamera
 {
@@ -215,9 +351,155 @@ public:
 
 };
 
+
+void drawImageWithPCurve(char filename[], double centroids[][3], double* spacing, int length, int type, double color[3], std::vector<std::string> vertebraePoints) {
+    //read input mhd file
+  vtkSmartPointer<vtkMetaImageReader> reader =
+  vtkSmartPointer<vtkMetaImageReader>::New();
+  reader->SetFileName(filename);
+  reader->Update();
+
+  vtkSmartPointer<vtkImageReslice> reslice = vtkSmartPointer<vtkImageReslice>::New();
+  //reslice->SetOutputExtent(0, 9, 0, 100, 0, 0);
+  reslice->SetOutputSpacing(1,1,spacing[2]);
+  reslice->SetInputConnection(reader->GetOutputPort());
+  reslice->Update();
+
+  //display
+  vtkSmartPointer<vtkResliceImageViewer> imageViewer =
+  vtkSmartPointer<vtkResliceImageViewer>::New();
+  vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor2 = 
+  vtkSmartPointer<vtkRenderWindowInteractor>::New();
+
+  imageViewer->SetResliceModeToAxisAligned();
+  imageViewer->SetInputConnection(reslice->GetOutputPort());
+  imageViewer->SetupInteractor(renderWindowInteractor2);
+  imageViewer->SetColorLevel(500);
+  imageViewer->SetColorWindow(2000);
+
+  //set z coord always the most center slice 
+  seedZ = (imageViewer->GetSliceMax())/2;
+
+  imageViewer->SetSize(reader->GetWidth(), reader->GetHeight());
+  imageViewer->SetSlice(seedZ);
+  //imageViewer->SetSliceOrientationToXY();
+  if (type == 2) {
+    imageViewer->SetSliceOrientationToYZ();
+    for (unsigned i = 0; i < length; i++) {
+      centroids[i][0] = 400;
+    }
+  } else if (type == 1) {
+    imageViewer->SetSliceOrientationToXZ();
+  }
+  imageViewer->GetRenderer()->AddActor(drawPointsDouble(centroids, spacing, length, vertebraePoints));
+  imageViewer->GetRenderer()->AddActor(makeLine(centroids, length, color));
+
+    // Setup the text and add it to the renderer
+  /*vtkSmartPointer<vtkTextActor> textActor = 
+  vtkSmartPointer<vtkTextActor>::New();
+  textActor->SetInput ( "Hello world" );
+  textActor->SetPosition2 ( 10, 40 );
+  textActor->GetTextProperty()->SetFontSize ( 24 );
+  textActor->GetTextProperty()->SetColor ( 1.0, 0.0, 0.0 );
+  imageViewer->GetRenderer()->AddActor2D ( textActor );
+
+
+  for (int i = 0; i < vertebraePoints.size(); i++) {
+    // Setup the text and add it to the renderer
+    vtkSmartPointer<vtkTextActor> textActor = 
+    vtkSmartPointer<vtkTextActor>::New();
+    textActor->SetInput ("T");
+    textActor->SetPosition2 ( centroids[i][0], centroids[i][1] );
+    textActor->GetTextProperty()->SetFontSize ( 12 );
+    textActor->GetTextProperty()->SetColor ( 1.0, 0.0, 0.0 );
+    imageViewer->GetRenderer()->AddActor2D ( textActor );    
+  }*/
+  imageViewer->GetRenderer()->ResetCamera();
+  imageViewer->Render();
+    seedZ = imageViewer->GetSlice();
+
+  vtkSmartPointer<MouseInteractorStyle3> style =
+  vtkSmartPointer<MouseInteractorStyle3>::New();
+  
+  renderWindowInteractor2->SetInteractorStyle(style);
+  //renderWindowInteractor2->UpdateSize(100,100);
+  renderWindowInteractor2->Start();
+}
+
+void drawImageWithCurve(char filename[], std::vector<std::vector<int>> centroids, double* spacing, std::vector<std::string> vertebraePoints) {
+    //read input mhd file
+  vtkSmartPointer<vtkMetaImageReader> reader =
+  vtkSmartPointer<vtkMetaImageReader>::New();
+  reader->SetFileName(filename);
+  reader->Update();
+
+  vtkSmartPointer<vtkImageReslice> reslice = vtkSmartPointer<vtkImageReslice>::New();
+  //reslice->SetOutputExtent(0, 9, 0, 100, 0, 0);
+  reslice->SetOutputSpacing(1,1,spacing[2]);
+  reslice->SetInputConnection(reader->GetOutputPort());
+  reslice->Update();
+
+  //display
+  vtkSmartPointer<vtkResliceImageViewer> imageViewer =
+  vtkSmartPointer<vtkResliceImageViewer>::New();
+  vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor2 = 
+  vtkSmartPointer<vtkRenderWindowInteractor>::New();
+
+  imageViewer->SetResliceModeToAxisAligned();
+  imageViewer->SetInputConnection(reslice->GetOutputPort());
+  imageViewer->SetupInteractor(renderWindowInteractor2);
+  imageViewer->SetColorLevel(500);
+  imageViewer->SetColorWindow(2000);
+
+  //set z coord always the most center slice 
+  seedZ = (imageViewer->GetSliceMax())/2;
+
+  imageViewer->SetSize(reader->GetWidth(), reader->GetHeight());
+  imageViewer->SetSlice(seedZ);
+  //imageViewer->SetSliceOrientationToXY();
+  imageViewer->SetSliceOrientationToYZ();
+  imageViewer->GetRenderer()->AddActor(drawPoints(centroids, spacing, vertebraePoints));
+  imageViewer->GetRenderer()->ResetCamera();
+  imageViewer->Render();
+    seedZ = imageViewer->GetSlice();
+
+  vtkSmartPointer<MouseInteractorStyle3> style =
+  vtkSmartPointer<MouseInteractorStyle3>::New();
+  
+  renderWindowInteractor2->SetInteractorStyle(style);
+  //renderWindowInteractor2->UpdateSize(100,100);
+  renderWindowInteractor2->Start();
+}
 //for mouse event
 vtkStandardNewMacro(MouseInteractorStyle3);
 
+double calcAvg(std::vector<double> vec) {
+    double sum;
+    for(std::size_t i = 0; i < vec.size(); i++)
+       sum += vec.at(i);
+    return sum/vec.size();
+}
+
+double findPearsonCorrelation(std::vector<double> x, std::vector<double> y) {
+  // Find the avg of first and second.
+  double xbar = calcAvg(x);
+  double ybar = calcAvg(y);
+  double a = 0;
+  double b = 0;
+  double total_a_sq = 0;
+  double total_b_sq = 0;
+  double total_axb = 0;
+  std::cout << "The sizes are " << x.size();
+  std::cout << " and " << y.size();
+  for(std::size_t i = 0; i < y.size(); i++) {
+    a = (xbar - x.at(i));
+    b = (ybar - y.at(i));
+    total_axb += (a * b);
+    total_a_sq += (a * a);
+    total_b_sq += (b * b);
+  }
+  return total_axb/sqrt(total_a_sq * total_b_sq);
+}
 //This is the main method for the entire project, add your part here
 int main(int argc, char *argv[])
 {
@@ -252,6 +534,10 @@ int main(int argc, char *argv[])
         useAnnotations = true;
         std::cout << "-a Using the lml file annotation in the directory" << endl;
       }
+      if (strcmp(argv[i], "-c") == 0) {
+        useComponents = true;
+        std::cout << "-c Decompose into 2D projections" << endl;
+      }
     }
   }
 
@@ -268,6 +554,7 @@ int main(int argc, char *argv[])
   reslice->SetInputConnection(reader->GetOutputPort());
   reslice->Update();
 
+
   //display
   vtkSmartPointer<vtkResliceImageViewer> imageViewer =
   vtkSmartPointer<vtkResliceImageViewer>::New();
@@ -279,6 +566,7 @@ int main(int argc, char *argv[])
   flipXFilter->SetFilteredAxis(1); // flip y axis
   flipXFilter->SetInputConnection(reslice->GetOutputPort()); 
   flipXFilter->Update();
+
 
   imageViewer->SetResliceModeToAxisAligned();
   imageViewer->SetInputConnection(flipXFilter->GetOutputPort());
@@ -292,7 +580,7 @@ int main(int argc, char *argv[])
   imageViewer->SetSize(reader->GetWidth(), reader->GetHeight());
   imageViewer->SetSlice(seedZ);
   //imageViewer->SetSliceOrientationToXY();
-  imageViewer->SetSliceOrientationToXZ();
+  imageViewer->SetSliceOrientationToXY();
   imageViewer->Render();
 
   seedZ = imageViewer->GetSlice();
@@ -361,6 +649,9 @@ int main(int argc, char *argv[])
     // read the lml file.
     centroids1 = calculator->loadAnnotationData(argv[1]);
     std::cout << "LOADING CENTROIDS from .lml file" << endl;
+      // Loading the color map
+  calculator->loadColorMap(argv[1]);
+    std::cout << "LOADING THE VERTEBRAE MAPPING. " << endl;
   }
   else
   {
@@ -419,10 +710,20 @@ int main(int argc, char *argv[])
  // calculator->loadTransofrm(trans);
   //calculator->printTransform();
   //calculator->transformSpine1();
- //calculator->printSpine1();
-  calculator->crateSpineFit(1);
+ //calculator->printSpine1();{
+  if (useComponents == true) {
+    calculator->crateSpineFitX(1);
+    calculator->crateSpineFitY(2);
+  }
+  else {
+     calculator->crateSpineFit(1);
+  }
+ 
   calculator->printAngles();
   // calculator->multidimfit();
+
+
+
 
   //Set colors for spine
   double color1[3] = {1, 0, 0};
@@ -457,6 +758,7 @@ int main(int argc, char *argv[])
   camera->Roll(90.0);
   camera->Pitch(90.0);
   std::cout<<"The current viewup is " << *(camera->GetViewUp());
+  
   // Setup render window, renderer, and interactor
   vtkSmartPointer<vtkRenderer> renderer =
   vtkSmartPointer<vtkRenderer>::New();
@@ -478,11 +780,33 @@ int main(int argc, char *argv[])
 
   // blue curve
   renderer->AddActor(makeLine(calculator->fit1,calculator->spine1Length,colorA));
+  if (useComponents) {
+    renderer->AddActor(makeLine(calculator->fit2, calculator->spine1Length, color2));
+    renderer->AddActor(drawPointsDouble(calculator->fit2, spacing1, calculator->spine1Length, calculator->vertebraePoints));
+    drawImageWithPCurve(argv[1], calculator->fit2, spacing1, calculator->spine1Length, 2, color2, calculator->vertebraePoints);
+  }
   renderer->AddActor(makeSpine(argv[1]));
-  renderer->AddActor(drawPoints(centroids1, spacing1));
+  // Adding points on the main line
+  renderer->AddActor(drawPoints(centroids1, spacing1, calculator->vertebraePoints));
+
+  // Adding points on the projected lines.
+  renderer->AddActor(drawPointsDouble(calculator->fit1, spacing1, calculator->spine1Length, calculator->vertebraePoints));
+
   //Ouput final view
   renderWindow->Render();
   renderWindowInteractor->Start();
 
+
+  // Drawing image with curve
+  //drawImageWithCurve(argv[1], centroids1, spacing1);
+  drawImageWithPCurve(argv[1], calculator->fit1, spacing1, calculator->spine1Length, 1, colorA, calculator->vertebraePoints);
+
+  // Finding the correlation
+  double r_kappa_ca_X = findPearsonCorrelation(calculator->kappaX, calculator->caX);
+  std::cout << "The X correlation is " << r_kappa_ca_X << endl;
+  double r_kappa_ca_Y = findPearsonCorrelation(calculator->kappaY, calculator->caY);
+  std::cout << "The Y correlation is " << r_kappa_ca_Y << endl;
+  double r_max_kappa_X = findPearsonCorrelation(calculator->maxAnglesY, calculator->kappaY);
+  std::cout << "The maxAngle correlation is " << r_max_kappa_X << endl;
   return EXIT_SUCCESS;
 }

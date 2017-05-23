@@ -336,7 +336,7 @@ void ScCalc::getGeometricCurvature(double points[][3], unsigned spLength, unsign
             sumY += (j * yStore[j]) * pow(dz[i], j-1);
         }
 
-        cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
+        //cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
         fder[i][0] = sumX;
         fder[i][1] = sumY;
         fder[i][2] = dz[i]; // verify this
@@ -355,7 +355,7 @@ void ScCalc::getGeometricCurvature(double points[][3], unsigned spLength, unsign
             sumY += (j * (j-1) * yStore[j]) * pow(dz[i], j-2);
         }
 
-        cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
+        //cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
         sder[i][0] = sumX;
         sder[i][1] = sumY;
         sder[i][2] = dz[i]; // verify this
@@ -374,6 +374,256 @@ void ScCalc::getGeometricCurvature(double points[][3], unsigned spLength, unsign
 
 }
 
+// Added this
+// Assuming parameter z
+void ScCalc::getGeometricCurvatureMod(double points[][3], unsigned spLength, unsigned order, double *xStore, double *yStore, double *dz, int type) {
+    // we have the coefficients. Compute the first derivative at the point
+    double (*fder)[3];
+    double (*sder)[3];
+    fder = new double[spLength][3];
+    sder = new double[spLength][3];
+    //double *kappa;
+    cout << "Calculating the geometric curvature !!! " << endl;
+    int component = 0;
+    if (xStore[0] == xStore[1] && xStore[1] == xStore[2]) {
+        component = 1;
+    }
+    if (yStore[0] == yStore[1] && yStore[1] == yStore[2]) {
+        component = 2;
+    }
+
+    for (int i = 0; i < spLength; ++i) 
+    {
+        double sumX = 0;
+        double sumY = 0;
+        double sumZ = 0;
+        for (int j = order; j > 1; j--) 
+        {
+            sumX += (j * xStore[j]) * pow(dz[i], j-1);
+            sumY += (j * yStore[j]) * pow(dz[i], j-1);
+        }
+
+        //cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
+        if (component == 1) {
+            fder[i][0] = 1;
+        }
+        else {
+            fder[i][0] = sumX;
+        }
+        fder[i][1] = sumY;
+        fder[i][2] = dz[i]; // verify this
+    }
+
+    // calculate the second derivative
+    for (unsigned i = 0; i < spLength; ++i) 
+    {
+        double sumX = 0;
+        double sumY = 0;
+        double sumZ = 0;
+
+        for (unsigned j = order; j > 3; --j) 
+        {
+            sumX += (j * (j-1) * xStore[j]) * pow(dz[i], j-2);
+            sumY += (j * (j-1) * yStore[j]) * pow(dz[i], j-2);
+        }
+
+        //cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
+        if (component == 1) {
+            sder[i][0] = 0;
+        }
+        else {
+            sder[i][0] = sumX;
+        }
+        sder[i][1] = sumY;
+        sder[i][2] = dz[i]; // verify this
+    }
+
+    // Calcuating the kappa value at each point
+    cout << "Composite formula : " << endl;
+    for (unsigned i = 0; i < spLength; i++) {
+        double kappa = (fder[i][0]*sder[i][1]) - (fder[i][1]*sder[i][0]) / 
+        pow(pow(fder[i][0], 2) + pow(fder[i][1], 2), 1.5);
+        cout << kappa << endl;
+    }
+
+    cout << "X component formula : " << endl;
+    for (unsigned i = 0; i < spLength; i++) {
+        double kappa = abs(sder[i][0]) / pow(pow(fder[i][0], 2) + 1, 1.5);
+        if (type == 1) {
+            cout << kappa << endl;
+            kappaX.push_back(kappa);
+        }
+    }
+
+    cout << "Y component formula : " << endl;
+    for (unsigned i = 0; i < spLength; i++) {
+        double kappa = abs(sder[i][1]) / pow(pow(fder[i][1], 2) + 1, 1.5);
+        if (type == 2) {
+            cout << kappa << endl;
+            kappaY.push_back(kappa);
+        }
+    }
+
+    // 
+    /*for (unsigned i = 0; i < spLength; ++i) 
+    {
+        cout << sqrt(pow((sder[i][2] * fder[i][1]) - (sder[i][1] * fder[i][2]), 2) +
+            pow((sder[i][0] * fder[i][2]) - (sder[i][2] * fder[i][0]), 2) + 
+            pow((sder[i][1] * fder[i][0]) - (sder[i][0] * fder[i][1]), 2)) /
+            pow(pow(fder[i][0], 2) + pow(fder[i][1], 2) + pow(fder[i][2], 2), 1.5);
+        cout << endl;
+    } */    
+}
+
+void ScCalc::computeGeometricCurvature2D(double points[][3], unsigned spLength, unsigned order, double *coefficients, double *x) {
+       // we have the coefficients. Compute the first derivative at the point
+    double (*fder)[2];
+    double (*sder)[2];
+    fder = new double[spLength][2];
+    sder = new double[spLength][2];
+    //double *kappa;
+    cout << "Calculating the new geometric curvature !!! " << endl;
+
+    /* Considering the parameteric equations in terms of t, we substitule x = t,
+    thus fder[i][0] = 1 and sder[i][0] = 0. Taking derivative wrt t
+    */
+    for (int i = 0; i < spLength; ++i) 
+    {
+        double sumY = 0;
+        for (int j = order-1; j > 1; j--) 
+        {
+            sumY += ((j * coefficients[j]) * pow(x[i], j-1));
+        }
+        fder[i][0] = 1;
+        fder[i][1] = sumY;
+    }
+
+    // calculate the second derivative
+    for (unsigned i = 0; i < spLength; ++i) 
+    {
+        double sumY = 0;
+
+        for (unsigned j = order-1; j > 1; --j) 
+        {
+            sumY += (j * (j-1) * coefficients[j]) * pow(x[i], j-2);
+        }
+        sder[i][0] = 0;
+        sder[i][1] = sumY;
+    }
+
+    // Calcuating the kappa value at each point
+    double *kappas = new double[spLength];
+    cout << "Composite formula : " << endl;
+    for (unsigned i = 0; i < spLength; i++) {
+        double kappa = abs(fder[i][0]*sder[i][1]) - (fder[i][1]*sder[i][0]) / 
+        pow(pow(fder[i][0], 2) + pow(fder[i][1], 2), 1.5);
+        cout << kappa << endl;
+        kappas[i] = kappa;
+    }
+
+    cout << "The new curvature angles are : " << endl;
+    for (unsigned i = 0; i < spLength-1; i++) {
+        cout << getCurvatureAngle(points[i][0], points[i][1], 0, points[i+1][0], points[i+1][1], 0, kappas[i]) << endl;
+    }
+
+} 
+// Assuming parameter z
+void ScCalc::getCurvatureAngleMod(double points[][3], unsigned spLength, unsigned order, double *xStore, double *yStore, double *dz, int type) {
+    // we have the coefficients. Compute the first derivative at the point
+    double (*fder)[3];
+    double (*sder)[3];
+    fder = new double[spLength][3];
+    sder = new double[spLength][3];
+    //double *kappa;
+    cout << "Calculating the geometric curvature !!! " << endl;
+    for (int i = 0; i < spLength-1; ++i) 
+    {
+        double sumX = 0;
+        double sumY = 0;
+        double sumZ = 0;
+        for (int j = order; j > 1; j--) 
+        {
+            sumX += (j * xStore[j]) * pow((dz[i]+dz[i+1])/2, j-1);
+            sumY += (j * yStore[j]) * pow((dz[i]+dz[i+1])/2, j-1);
+        }
+
+        //cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
+        fder[i][0] = sumX;
+        fder[i][1] = sumY;
+        fder[i][2] = dz[i]; // verify this
+    }
+
+    // calculate the second derivative
+    for (unsigned i = 0; i < spLength-1; ++i) 
+    {
+        double sumX = 0;
+        double sumY = 0;
+        double sumZ = 0;
+
+        for (unsigned j = order; j > 3; --j) 
+        {
+            sumX += (j * (j-1) * xStore[j]) * pow((dz[i]+dz[i+1])/2, j-2);
+            sumY += (j * (j-1) * yStore[j]) * pow((dz[i]+dz[i+1])/2, j-2);
+        }
+
+        //cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
+        sder[i][0] = sumX;
+        sder[i][1] = sumY;
+        sder[i][2] = dz[i]; // verify this
+    }
+
+    // Calcuating the kappa value at each point
+    /*cout << "Composite formula : " << endl;
+    for (unsigned i = 0; i < spLength-1; i++) {
+        double kappa = abs((fder[i][0]*sder[i][1]) - (fder[i][1]*sder[i][0])) / 
+        pow(pow(fder[i][0], 2) + pow(fder[i][1], 2), 1.5);
+        cout << "At point " << i << ", K = " << kappa << endl;
+        double ca = getCurvatureAngle(points[i][0], points[i][1], points[i][2], points[i+1][0], points[i+1][1], points[i+1][2], kappa);
+        cout << " curvature angle = " << ca << endl;
+    }
+
+    cout << "X component formula : " << endl;
+    for (unsigned i = 0; i < spLength-1; i++) {
+        double kappa = abs(sder[i][0]) / pow(pow(fder[i][0], 2) + 1, 1.5);
+        cout << "At point " << i << ", KX = " << kappa << endl;
+        double ca = getCurvatureAngle(points[i][0], points[i][1], points[i][2], points[i+1][0], points[i+1][1], points[i+1][2], kappa);
+        cout << " curvature angle = " << ca << endl;
+        if (type == 1) {
+            caX.push_back(ca);
+        }
+    }
+
+    cout << "Y component formula : " << endl;
+    for (unsigned i = 0; i < spLength-1; i++) {
+        double kappa = abs(sder[i][1]) / pow(pow(fder[i][1], 2) + 1, 1.5);
+        cout << "At point " << i << ", KY = " << kappa << endl;
+        double ca = getCurvatureAngle(points[i][0], points[i][1], points[i][2], points[i+1][0], points[i+1][1], points[i+1][2], kappa);
+        cout << " curvature angle = " << ca << endl;
+        if (type == 2) {
+            caY.push_back(ca);
+        }
+    }*/
+
+    // 
+    /*for (unsigned i = 0; i < spLength; ++i) 
+    {
+        cout << sqrt(pow((sder[i][2] * fder[i][1]) - (sder[i][1] * fder[i][2]), 2) +
+            pow((sder[i][0] * fder[i][2]) - (sder[i][2] * fder[i][0]), 2) + 
+            pow((sder[i][1] * fder[i][0]) - (sder[i][0] * fder[i][1]), 2)) /
+            pow(pow(fder[i][0], 2) + pow(fder[i][1], 2) + pow(fder[i][2], 2), 1.5);
+        cout << endl;
+    } */    
+}
+
+double ScCalc::getCurvatureAngle(double x1, double y1, double z1, double x2, double y2, double z2, double kappa) {
+
+        // Finding the distance between consecutive points
+        double distance = sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2) + pow(z2 - z1, 2));
+        return distance * kappa;
+        //cout << "The distance between (" << points[i+1][0] <<"," << points[i+1][1] "," << points[i+1][2] << ")";
+        //cout << " and (" << points[i][0] <<"," << points[i][1] "," << points[i][2] << ")" << " is " << distance << endl;
+}
+
 void ScCalc::crateSpineFit(int spineNum, unsigned order)
 {
     double (*spine)[3];
@@ -387,6 +637,172 @@ void ScCalc::crateSpineFit(int spineNum, unsigned order)
         fit = fit1;
         angles1 = new double[spLength - 3];
         maXanX = angles1;
+    }
+    double *dx = new double[spLength];
+    double *dy = new double[spLength];
+    double *dz = new double[spLength];
+
+    double *xStore = new double[order];
+    double *yStore = new double[order];
+    cout << "The spine length is " << spLength;
+    for (unsigned i = 0; i < spLength; ++i) 
+    {
+        dx[i] = spine[i][0];
+        dy[i] = spine[i][1];
+        dz[i] = spine[i][2];
+    }
+
+    polynomialfit(spLength, order, dz, dx, xStore);
+    polynomialfit(spLength, order, dz, dy, yStore);
+    /*xStore[0] = 0;
+    xStore[1] = 0;
+    xStore[2] = 0;
+    xStore[3] = 0;
+    xStore[4] = 0;
+    xStore[5] = 0;
+    xStore[6] = 0;*/
+    cout << endl;
+    cout << "Spine" << spineNum << " polynomial curve:" << endl;
+    cout << endl;
+
+    for (int i = 0; i < order; ++i)
+    {
+        cout << i << " order term ";
+        cout << "X: " << xStore[i];
+        cout << " Y: " << yStore[i] << endl;
+    }
+
+    for (unsigned i = 0; i < spLength; ++i) 
+    {
+        double sumX = 0;
+        double sumY = 0;
+
+        for (unsigned j = 0; j < order; ++j) 
+        {
+            sumX += xStore[j] * pow(dz[i], j);
+            sumY += yStore[j] * pow(dz[i], j);
+        }
+
+        //cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
+
+        fit[i][0] = sumX;
+        fit[i][1] = sumY;
+        fit[i][2] = dz[i];
+    }
+
+    double *anX = new double[spLength];
+    double *anY = new double[spLength];
+    
+
+    anglesX(fit, anX, spLength);
+    anglesY(fit, anY, spLength);
+    std::cout << "Geometric curvature for " << std::endl;
+    getGeometricCurvatureMod(fit, spLength, order, xStore, yStore, dz, 0);
+    getCurvatureAngleMod(fit, spLength, order, xStore, yStore, dz, 0);
+    analyze3DAngles(getMax3DanglesMod(fit, maXanX, spLength), 0);
+}
+
+void ScCalc::crateSpineFitX(int spineNum, unsigned order)
+{
+    std::cout<<"Analyzing angles in X" << std::endl;
+    double (*spine)[3];
+    double (*fit)[3];
+    unsigned spLength;
+    double *maXanX;
+    if (spineNum == 1) {
+        spine = spine1;
+        spLength = spine1Length;
+        fit1 = new double[spLength][3];
+        fit = fit1;
+        angles1 = new double[spLength - 3];
+        maXanX = angles1;
+    }
+    double *dx = new double[spLength];
+    double *dy = new double[spLength];
+    double *dz = new double[spLength];
+
+    double *xStore = new double[order];
+    double *yStore = new double[order];
+    cout << "The spine length is " << spLength;
+    for (unsigned i = 0; i < spLength; ++i) 
+    {
+        dx[i] = spine[i][0];
+        dy[i] = spine[i][1];
+        dz[i] = spine[i][2];
+    }
+
+    polynomialfit(spLength, order, dz, dx, xStore);
+
+    yStore[0] = 0;
+    yStore[1] = 0;
+    yStore[2] = 0;
+    yStore[3] = 0;
+    yStore[4] = 0;
+    yStore[5] = 0;
+    yStore[6] = 0;
+    cout << endl;
+    cout << "Spine" << spineNum << " polynomial curve:" << endl;
+    cout << endl;
+
+    for (int i = 0; i < order; ++i)
+    {
+        cout << i << " order term ";
+        cout << "X: " << xStore[i];
+        cout << " Y: " << yStore[i] << endl;
+    }
+
+    for (unsigned i = 0; i < spLength; ++i) 
+    {
+        double sumX = 0;
+        double sumY = 0;
+
+        for (unsigned j = 0; j < order; ++j) 
+        {
+            sumX += xStore[j] * pow(dz[i], j);
+            sumY += yStore[j] * pow(dz[i], j);
+        }
+
+        cout << "Next point: " << sumX << ", " << sumY << ", " << dz[i] << endl;
+
+        fit[i][0] = sumX;
+        fit[i][1] = sumY;
+        fit[i][2] = dz[i];
+    }
+
+    double *anX = new double[spLength];
+    double *anY = new double[spLength];
+    
+
+    //anglesX(fit, anX, spLength);
+    //anglesY(fit, anY, spLength);
+    std::cout << "Geometric curvature for X " << std::endl;
+    getGeometricCurvatureMod(fit, spLength, order, xStore, yStore, dz, 1);
+    getCurvatureAngleMod(fit, spLength, order, xStore, yStore, dz, 1);
+    computeGeometricCurvature2D(fit, spLength, order, xStore, dz);
+    compX = getMax3DanglesMod(fit, maXanX, spLength);
+    cout << "Printing the maxAnX for X before components" << endl;
+    for(unsigned i; i < spLength; i++) {
+        cout  << maXanX[i] << endl;
+        maxAnglesX.push_back(maXanX[i]);
+    }
+
+    analyze3DAngles(compX, 1);
+}
+
+void ScCalc::crateSpineFitY(int spineNum, unsigned order)
+{
+    std::cout<<"Analyzing angles in Y" << std::endl;
+    double (*spine)[3];
+    double (*fit)[3];
+    unsigned spLength;
+    double *maXanX;
+    if (spineNum == 2) {
+        spine = spine1;
+        spLength = spine1Length;
+        fit2 = new double[spLength][3];
+        fit = fit2;
+        angles2 = new double[spLength - 3];
+        maXanX = angles2;
     }
     double *dx = new double[spLength];
     double *dy = new double[spLength];
@@ -446,8 +862,17 @@ void ScCalc::crateSpineFit(int spineNum, unsigned order)
 
     //anglesX(fit, anX, spLength);
     //anglesY(fit, anY, spLength);
-    getGeometricCurvature(fit, spLength, order, xStore, yStore, dz);
-    analyze3DAngles(getMax3DanglesMod(fit, maXanX, spLength));
+    std::cout << "Geometric curvature for Y" << std::endl;
+    getGeometricCurvatureMod(fit, spLength, order, xStore, yStore, dz, 2);
+    computeGeometricCurvature2D(fit, spLength, order, yStore, dz);
+    getCurvatureAngleMod(fit, spLength, order, xStore, yStore, dz, 2);
+    compY = getMax3DanglesMod(fit, maXanX, spLength);
+    cout << "Printing the maxAnX for Y before components" << endl;
+    for(unsigned i; i < spLength; i++) {
+        cout << maXanX[i] << endl;
+        maxAnglesY.push_back(maXanX[i]);
+    }
+    analyze3DAngles(compY, 2);
 }
 
 bool ScCalc::polynomialfit(int obs, int degree, 
@@ -510,16 +935,66 @@ void ScCalc::getMax3Dangles(double points[][3], double angles[], int npoints)
 
             double newAngle = acos(dotProduct / (mag1 * mag2)) * 180/3.1415926358979323;
             if (newAngle > angles[i - 1]) {
-               cout << "Max so far: " << i << " and " << j << " with angle " << newAngle << endl;
+                //cout << "Max so far: " << i << " and " << j << " with angle " << newAngle << endl;
               angles[i - 1] = newAngle;
             }
             else {
-                cout << "Broke: " << i << " and " << j << " with angle " << newAngle << endl;
+                //cout << "Broke: " << i << " and " << j << " with angle " << newAngle << endl;
                 break;
             }
         }
     }
 }
+
+
+int getClosestIntersectionPoint(double points[][3], int npoints, double* p1, double* p2, double* p3, double* p4) {
+
+    double x1 = 0;
+    double x2 = 0;
+    double x3 = 0;
+    double x4 = 0;
+    double y1 = 0;
+    double y2 = 0;
+    double y3 = 0;
+    double y4 = 0;
+    if (p1[0] == 0 &&  p2[0] == 0 && p2[0] == p3[0]) {
+         x1 = p1[1];
+         x2 = p2[1];
+         x3 = p3[1];
+         x4 = p4[1];
+         y1 = p1[2];
+         y2 = p2[2];
+         y3 = p3[2];
+         y4 = p4[2];
+    }
+    else {
+         x1 = p1[0];
+         x2 = p2[0];
+         x3 = p3[0];
+         x4 = p4[0];
+         y1 = p1[2];
+         y2 = p2[2];
+         y3 = p3[2];
+         y4 = p4[2];
+    }
+    cout << x1 << "  " << x2 << "  " << y1 << endl;
+    double px = (((x1*y2 - y1*x2)*(x3-x4)) - ((x1-x2)*(x3*y4 - y3*y4)))/((x1-x2)*(y3-y4) - (y1-y2)*(x3-x4));
+    double py = (((x1*y2 - y1*x2)*(y3-y4)) - ((y1-y2)* (x3*y4 - y3*x4))) /
+    ((x1-x2)*(y3-y4) - (y1-y2)*(x3-x4));
+    // cout << "Point of intersection " << px << " and " << py << endl;
+
+    // Find the closest one the intersection point, use only the z for now.
+    int minIndex = 0;
+    double minDistance = abs(py - points[0][2]);
+    for (unsigned i = 1; i < npoints; i ++ ) {
+        if (abs(py - points[i][2]) < minDistance) {
+            minDistance = abs( py - points[i][2]);
+            minIndex = i;
+        }
+    }
+    return minIndex;
+}
+
 
 // added this
 // Finding the maxangles within the section. 
@@ -574,19 +1049,23 @@ vector<SpineComponent> ScCalc::getMax3DanglesMod(double points[][3], double angl
         sp.index1 = it->first;
         sp.index2 = it1->first;
         sp.angle = it1->second;
+        // find the intersection point of both points and match it to the closest vertebra centroid.
+        sp.apex = getClosestIntersectionPoint(points, npoints, points[it->first], points[it->first - 1], points[it1->first], points[it1->first - 1]);
+        cout << sp.apex << endl;
         components.push_back(sp);
       }
     }
     return components;
 }
 
+
 bool compareByAngle(const SpineComponent &a, const SpineComponent &b) {
     return a.angle > b.angle;
 }
 // added this
-void ScCalc::analyze3DAngles(std::vector<SpineComponent> comp) {
+void ScCalc::analyze3DAngles(std::vector<SpineComponent> comp, int type) {
   // find the largest angle - record the endpoints.
-  // sort the angles based on 
+  // sort the angles based on
   std::sort(comp.begin(), comp.end(), compareByAngle);
   for(int i = 0; i < comp.size(); i++ ) {
     std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
@@ -607,9 +1086,447 @@ void ScCalc::analyze3DAngles(std::vector<SpineComponent> comp) {
     }
     if (includeInResults == true) {
       results.push_back(comp[i]);
-      std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+      std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << " Apex at " << comp[i].apex+1;
+      //std::cout << vertebraePoints.size() << endl;
+      std::cout << " i.e. between : " << vertebraePoints[comp[i].index1-1] << " and " << vertebraePoints[comp[i].index2-1] << " Apex at " << vertebraePoints[comp[i].apex] << endl;
     }
   }
+
+  // Do the lenke classification here.
+  doLenkeClassificationReloaded(comp, results, type);
+  doSimpleClassification(comp, results);
+}
+
+void ScCalc::doLenkeClassificationReloaded(std::vector<SpineComponent> comp, std::vector<SpineComponent> results, int type) {
+    if (type == 0) {
+        doLenkeClassification(comp, results);
+    }
+    else {
+        if (type == 1) {
+            std::string primaryCurve = "";
+            // Find some important indicies:
+            int t5Index = 0;
+            int t12Index = 0;
+            int s1ClosestIndex = 0;
+            bool s1Assigned = false;
+            for(int i = 0; i < vertebraePoints.size(); i++) {
+                if (vertebraePoints[i].compare("T5_center") == 0)
+                    t5Index = i;
+                else if (vertebraePoints[i].compare("T12_center") == 0) 
+                    t12Index = i;
+                else if (vertebraePoints[i].compare("S1_center") == 0) {
+                    s1ClosestIndex = i;
+                    s1Assigned = true;
+                }
+            }
+            int offset = 1;
+            if (!s1Assigned) {
+                if (t5Index < t12Index) {
+                    s1ClosestIndex = vertebraePoints.size()-1;
+                    offset =-1;
+                }
+                else
+                    s1ClosestIndex = 0;
+            }
+
+            // Step 1: Find the apex (CORONAL)
+            // Find the average X of all vertibrae, then find one with the greatest deviation from the average.
+            double sum = 0;
+            double avg = 0;
+            for (int i = 0; i <  vertebraePoints.size(); i++) {
+                sum += fit1[i][0];
+            }
+            avg = sum / vertebraePoints.size();
+
+            std::string apexVert = "";
+            int apexVertIndex = 0;
+            for (int i = 0; i <  vertebraePoints.size(); i++) {
+                if (vertebraePoints[i] == "T3_center") {
+                    apexVertIndex = i;
+                    break;
+                }
+            }
+
+            for (int i = apexVertIndex; i <  vertebraePoints.size(); i++) {
+                std::cout << "Distance is " << abs(avg - fit1[i][0]) << endl;
+                if (abs(avg - fit1[i][0]) > abs(avg - fit1[apexVertIndex][0])) {
+                    apexVertIndex = i;
+                }
+            }
+            apexVert = vertebraePoints[apexVertIndex];
+            std::cout << "The apex vert is " << apexVert << endl;
+
+
+            curveType = "Undefined";
+            for (int i = 0; i < results.size(); i++) {
+                if (i == 0 && vertebraePoints[results[i].index1].substr(0, 1) == "T" && vertebraePoints[results[i].index2].substr(0, 1) == "T") {
+                    // This type 1 to 4 with MT as major curve
+                    // Include criteria to check 1 to 4
+                    std::cout << "Type 1,2,3,4";
+                    curveType = "1";
+                }
+
+                if ((i == 0 && vertebraePoints[results[i].index1].substr(0, 1) == "T" && vertebraePoints[results[i].index2].substr(0, 1) == "L") || 
+                    (i == 0 && vertebraePoints[results[i].index1].substr(0, 1) == "L" && vertebraePoints[results[i].index2].substr(0, 1) == "T") || 
+                    (i == 0 && vertebraePoints[results[i].index1].substr(0, 1) == "L" && vertebraePoints[results[i].index2].substr(0, 1) == "L")) {
+                    // Type 4 or 5 or 6 
+                    std::cout<<"Type 4,5,6 ";
+                    curveType = "6";
+                    apexVert = vertebraePoints[apexVertIndex];
+                    std::cout << "The apex vert is " << apexVert << endl;
+                    // Classify to the appropriate curve type
+                    if (apexVert.substr(0,2) == "T6" || apexVert.substr(0,2) == "T7" || apexVert.substr(0,2) == "T8" || 
+                        apexVert.substr(0,2) == "T9" || apexVert.substr(0,3) == "T10" || apexVert.substr(0,3) == "T11") {
+                        curveType = "1";
+                    }
+                }
+            }
+
+            // Step 2: Find lumbar modifier (CORONAL)
+            // Find the CSVL
+            sum = 0;
+            avg = 0;
+            int lumbarCount = 0;
+            for (int i = 0; i <  vertebraePoints.size(); i++) {
+                if (vertebraePoints[i].substr(0, 1) == "L"){
+                    sum += fit1[i][0];
+                    lumbarCount += 1;
+                }
+            }
+            avg = sum / lumbarCount;
+
+            std::cout<< fit1[s1ClosestIndex][0] << " is the xcoordinate of s1" << std::endl;
+            int maxLumbarIndex = 0;
+            // find the lumbar vertebrae that is furthest from the CSVL
+            for(int i = 0; i < vertebraePoints.size(); i++) {
+                if (vertebraePoints[i].substr(0, 1) == "L"){
+                    if (abs(avg - fit1[i][0]) > abs(avg - fit1[maxLumbarIndex][0])) {
+                        maxLumbarIndex = i;
+                    }
+                }
+            }
+            int vertSize = 0;
+            // Assume the size of the vertebrae is the distance between two consecutive vertebrae
+            vertSize = abs(fit1[s1ClosestIndex][0] - fit1[s1ClosestIndex + offset][0]);
+            // Assign the appropriate lumbar modifier
+            if (fit1[maxLumbarIndex][0] - fit1[s1ClosestIndex][0] > (vertSize/2)) {
+                lumbarModifier = " Modifier C";
+            }
+            else if (fit1[maxLumbarIndex][0] - fit1[s1ClosestIndex][0] < (vertSize/2)) {
+                lumbarModifier = " Modifier A ";
+            }
+            else {
+                lumbarModifier = " Modifier B";
+            }
+        }
+        else if (type == 2) {
+            // Find some important indicies:
+            int t2Index = 0;
+            int t5Index = 0;
+            int t10Index = 0;
+            int t12Index = 0;
+            int l2Index = 0;
+            int s1ClosestIndex = 0;
+            bool s1Assigned = false;
+            for(int i = 0; i < vertebraePoints.size(); i++) {
+                if (vertebraePoints[i].compare("T5_center") == 0)
+                    t5Index = i;
+                else if (vertebraePoints[i].compare("T12_center") == 0) 
+                    t12Index = i;
+                else if (vertebraePoints[i].compare("S1_center") == 0) {
+                    s1ClosestIndex = i;
+                    s1Assigned = true;
+                }
+            }
+
+          // Step 1
+          bool isPT = false;
+          bool isMT = false;
+          bool isTL = false;
+          if (curveType == "1") {
+            // Definitely Type 1 to 4
+            isMT = true;
+            // check for minor curves
+            for(int i = 0; i < comp.size(); i++ ) {
+              if ((comp[i].index1 == t2Index && comp[i].index2 == t5Index) || 
+               (comp[i].index1 == t5Index && comp[i].index2 == t2Index)) {
+                  std::cout << "The angle is " << comp[i].angle << " between t2 and t5" << std::endl;
+                  std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+                  if (comp[i].angle >= 20) {
+                      isPT = true;
+                  }   
+              }
+
+              if ((comp[i].index1 == t10Index && comp[i].index2 == l2Index) || 
+               (comp[i].index1 == l2Index && comp[i].index2 == t10Index)) {
+                  std::cout << "The angle is " << comp[i].angle << " between t10 and l2" << std::endl;
+                  std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+                  if (comp[i].angle >= 20) {
+                      isTL = true;
+                  }
+              }
+            }
+            std::cout << "The CURVE TYPE IS ";
+            if (isPT && isTL) {
+              curveType =  "Type 4";
+            }
+            else if (isPT && !isTL) {
+              curveType = "Type 2";
+            }
+            else if (!isPT && isTL) {
+              curveType = "Type 3";
+            }
+            else if (!isPT && !isTL) {
+              curveType = "Type 1";
+            }
+          }
+          else if (curveType == "6") {
+            // Definitely Type 4 to 6
+            isTL = true;
+            // check for minor curves
+            for(int i = 0; i < comp.size(); i++ ) {
+              if ((comp[i].index1 == t2Index && comp[i].index2 == t5Index) || 
+               (comp[i].index1 == t5Index && comp[i].index2 == t2Index)) {
+                  std::cout << "The angle is " << comp[i].angle << " between t2 and t5" << std::endl;
+                  std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+                  if (comp[i].angle >= 20) {
+                      isPT = true;
+                  }   
+              }
+
+              if ((comp[i].index1 == t10Index && comp[i].index2 == l2Index) || 
+               (comp[i].index1 == l2Index && comp[i].index2 == t10Index)) {
+                  std::cout << "The angle is " << comp[i].angle << " between t10 and l2" << std::endl;
+                  std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+                  if (comp[i].angle >= 20) {
+                      isMT = true;
+                  }
+              }
+            std::cout << "The CURVE TYPE IS ";
+            if (isPT && isMT) {
+              curveType = "Type 4";
+            }
+            else if (!isPT && isMT) {
+              curveType = "Type 6";
+            }
+            else if (!isPT && !isMT) {
+              curveType = "Type 5";
+            }
+
+          }
+        }
+
+                  // Step 1.5: Find the non-structural curves
+          for(int i = 0; i < comp.size(); i++ ) {
+            if ((comp[i].index1 == t2Index && comp[i].index2 == t5Index) || 
+             (comp[i].index1 == t5Index && comp[i].index2 == t2Index)) {
+                std::cout << "The angle is " << comp[i].angle << " between t2 and t5" << std::endl;
+                std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+                if (comp[i].angle >= 20) {
+                    sagittalModifier = " - (hypokhyphosis)";
+                }
+                else if (comp[i].angle >= 10 && comp[i].angle <= 40) {
+                    sagittalModifier = " N (normal)";
+                }
+                else {
+                    sagittalModifier = " + (hyperkhyphosis)";
+                }   
+            }
+          }
+
+            // Step 3: Find sagittal modifier (SAGITTAL)
+            // Measure T5 to T12
+          for(int i = 0; i < comp.size(); i++ ) {
+            if ((comp[i].index1 == t5Index && comp[i].index2 == t12Index) || 
+             (comp[i].index2 == t5Index && comp[i].index1 == t12Index)) {
+                std::cout << "The angle is " << comp[i].angle << " between t5 and t12" << std::endl;
+                std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+                if (comp[i].angle < 10) {
+                    sagittalModifier = " - (hypokhyphosis)";
+                }
+                else if (comp[i].angle >= 10 && comp[i].angle <= 40) {
+                    sagittalModifier = " N (normal)";
+                }
+                else {
+                    sagittalModifier = " + (hyperkhyphosis)";
+                }   
+            }
+          }
+
+          std::string classification = curveType + lumbarModifier + sagittalModifier;
+          std::cout << "The final lenke classification is " << classification << endl;
+      }
+    }
+}
+
+void ScCalc::doLenkeClassification(std::vector<SpineComponent> comp, std::vector<SpineComponent> results) {
+    std::string primaryCurve = "";
+    std::string lumbarModifier = "";
+    std::string sagittalModifier = "";
+
+    // Find some important indicies:
+    int t5Index = 0;
+    int t12Index = 0;
+    int s1ClosestIndex = 0;
+    bool s1Assigned = false;
+    for(int i = 0; i < vertebraePoints.size(); i++) {
+        if (vertebraePoints[i].compare("T5_center") == 0)
+            t5Index = i;
+        else if (vertebraePoints[i].compare("T12_center") == 0) 
+            t12Index = i;
+        else if (vertebraePoints[i].compare("S1_center") == 0) {
+            s1ClosestIndex = i;
+            s1Assigned = true;
+        }
+    }
+    int offset = 1;
+    if (!s1Assigned) {
+        if (t5Index < t12Index) {
+            s1ClosestIndex = vertebraePoints.size()-1;
+            offset =-1;
+        }
+        else
+            s1ClosestIndex = 0;
+    }
+
+    // Step 1: Find the apex (CORONAL)
+    // Find the average X of all vertibrae, then find one with the greatest deviation from the average.
+    double sum = 0;
+    double avg = 0;
+    for (int i = 0; i <  vertebraePoints.size(); i++) {
+        sum += fit1[i][0];
+    }
+    avg = sum / vertebraePoints.size();
+
+    std::string apexVert = "";
+    int apexVertIndex = 0;
+    for (int i = 0; i <  vertebraePoints.size(); i++) {
+        if (vertebraePoints[i] == "T3_center") {
+            apexVertIndex = i;
+            break;
+        }
+    }
+
+    for (int i = apexVertIndex; i <  vertebraePoints.size(); i++) {
+        std::cout << "Distance is " << abs(avg - fit1[i][0]) << endl;
+        if (abs(avg - fit1[i][0]) > abs(avg - fit1[apexVertIndex][0])) {
+            apexVertIndex = i;
+        }
+    }
+    apexVert = vertebraePoints[apexVertIndex];
+    std::cout << "The apex vert is " << apexVert << endl;
+    std::string curveType = "Undefined";
+    // Classify to the appropriate curve type
+    if (apexVert.substr(0,2) == "T3" || apexVert.substr(0,2) == "T4" || apexVert.substr(0,2) == "T5") {
+        curveType = "Proximal Thoracic (Type 1)";
+    } else if (apexVert.substr(0,2) == "T6" || apexVert.substr(0,2) == "T7" || apexVert.substr(0,2) == "T8" || 
+        apexVert.substr(0,2) == "T9" || apexVert.substr(0,3) == "T10" || apexVert.substr(0,3) == "T11") {
+
+        curveType = "Main Thoracic (Type 2/3/4)";
+    } else if ( apexVert.substr(0,2) == "T12" || apexVert.substr(0,1) == "L") {
+        curveType = "Thoracolumbar/Lumbar (TL) (Type 5/6)";
+    }
+    cout << "Curve type is " << curveType <<endl;
+
+    // Step 2: Find lumbar modifier (CORONAL)
+    // Find the CSVL
+    sum = 0;
+    avg = 0;
+    int lumbarCount = 0;
+    for (int i = 0; i <  vertebraePoints.size(); i++) {
+        if (vertebraePoints[i].substr(0, 1) == "L"){
+            sum += fit1[i][0];
+            lumbarCount += 1;
+        }
+    }
+    avg = sum / lumbarCount;
+
+    std::cout<< fit1[s1ClosestIndex][0] << " is the xcoordinate of s1" << std::endl;
+    int maxLumbarIndex = 0;
+    // find the lumbar vertebrae that is furthest from the CSVL
+    for(int i = 0; i < vertebraePoints.size(); i++) {
+        if (vertebraePoints[i].substr(0, 1) == "L"){
+            if (abs(avg - fit1[i][0]) > abs(avg - fit1[maxLumbarIndex][0])) {
+                maxLumbarIndex = i;
+            }
+        }
+    }
+    int vertSize = 0;
+    // Assume the size of the vertebrae is the distance between two consecutive vertebrae
+    vertSize = abs(fit1[s1ClosestIndex][0] - fit1[s1ClosestIndex + offset][0]);
+    // Assign the appropriate lumbar modifier
+    if (fit1[maxLumbarIndex][0] - fit1[s1ClosestIndex][0] > (vertSize/2)) {
+        lumbarModifier = " Modifier C";
+    }
+    else if (fit1[maxLumbarIndex][0] - fit1[s1ClosestIndex][0] < (vertSize/2)) {
+        lumbarModifier = " Modifier A ";
+    }
+    else {
+        lumbarModifier = " Modifier B";
+    }
+
+    // Step 3: Find sagittal modifier (SAGITTAL)
+    // Measure T5 to T12
+  for(int i = 0; i < comp.size(); i++ ) {
+    if ((comp[i].index1 == t5Index && comp[i].index2 == t12Index) || 
+     (comp[i].index2 == t5Index && comp[i].index1 == t12Index)) {
+        std::cout << "The angle is " << comp[i].angle << " between t5 and t12" << std::endl;
+        std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+        if (comp[i].angle < 10) {
+            sagittalModifier = " - (hypokhyphosis)";
+        }
+        else if (comp[i].angle >= 10 && comp[i].angle <= 40) {
+            sagittalModifier = " N (normal)";
+        }
+        else {
+            sagittalModifier = " + (hyperkhyphosis)";
+        }   
+    }
+  }
+  std::string classification = curveType + lumbarModifier + sagittalModifier;
+  std::cout << "The final lenke classification is " << classification << endl;
+}
+
+
+void ScCalc::doSimpleClassification(std::vector<SpineComponent> comp, std::vector<SpineComponent> results) {
+    // Classify with Thoracic scoliosis or lumbar scoliosis
+
+    // Measure TK and LL
+    int t4Index = 0;
+    int t12Index = 0;
+    int s1ClosestIndex = 0;
+    int l1Index = 0;
+    bool s1Assigned = false;
+    for(int i = 0; i < vertebraePoints.size(); i++) {
+        if (vertebraePoints[i].compare("T4_center") == 0)
+            t4Index = i;
+        else if (vertebraePoints[i].compare("T12_center") == 0) 
+            t12Index = i;
+        else if (vertebraePoints[i].compare("S1_center") == 0) {
+            s1ClosestIndex = i;
+            s1Assigned = true;
+        }
+        else if (vertebraePoints[i].compare("L1_center") == 0) {
+            l1Index = i;
+        }
+    }
+
+   for(int i = 0; i < comp.size(); i++ ) {
+    if ((comp[i].index1 == t4Index && comp[i].index2 == t12Index) || 
+     (comp[i].index2 == t4Index && comp[i].index1 == t12Index)) {
+        std::cout << "TK: " << comp[i].angle << " between t4 and t12" << std::endl;
+        std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+    }
+    if ((comp[i].index1 == s1ClosestIndex && comp[i].index2 == l1Index) || 
+     (comp[i].index2 == l1Index && comp[i].index1 == s1ClosestIndex)) {
+        std::cout << "LL: " << comp[i].angle << " between L1 and S1" << std::endl;
+        std::cout << i + 1 << "." << " Angle: " << comp[i].angle << " between: " << comp[i].index1 << " and " << comp[i].index2 << endl;
+    }
+  }   
+
+    // Measure LL
+
+
 }
 
 void ScCalc::maXanglesX(double points[][3], double angles[], int npoints){
@@ -650,6 +1567,7 @@ for(int i = 0; i < npoints; i++){
     double theta1 = atan2(z1, x1)*180/3.1415926358979323;
     double theta2 = atan2(z2, x2)*180/3.1415926358979323;
     angles[i] = (180 + theta1 - theta2 + 360);
+    std::cout<<"AnglesX= "<<angles[i] << " with " << i << std::endl;
     while(angles[i]>360)angles[i]-=360;
 } }
 
@@ -703,6 +1621,7 @@ vector<vector<int>> ScCalc::loadAnnotationData(char* fileName)
         while((getline (ss, in_line, '\t') || getline(ss, in_line, '\n')) && col <=4 ) 
         {
           if (col != 0 && col != 1) {
+            cout << in_line << " IS ";
             int i = stoi(in_line, 0);
             i = i/spacing1[spacingIndex%3];
             numbers.push_back(i);;
@@ -717,6 +1636,46 @@ vector<vector<int>> ScCalc::loadAnnotationData(char* fileName)
     return vec;
 }
 
+void ScCalc::loadColorMap(char* fileName) {
+    FILE *fp;
+    vector<vector<int> > vec;
+
+    string sFileName = fileName;
+
+    size_t lastdot = sFileName.find_last_of(".");
+
+    if (lastdot != std::string::npos) {
+        sFileName = sFileName.substr(0, lastdot);
+    }
+    sFileName.append(".lml");
+
+    std::cout << "The .lml file name is " << sFileName << endl;
+    ifstream fileStream(sFileName);
+    if (!fileStream.is_open())
+    {
+        cout << "Exiting unable to open file " << fileName << endl;
+    }
+    int counter = 0;
+    string line;
+    int spacingIndex = 0;
+    while(getline(fileStream, line, '\n')) {
+        if (counter == 0) {
+            counter ++;
+            continue;
+        }
+        stringstream ss(line);
+        vector<int> numbers;
+        string in_line;
+        int col = 0;
+        while((getline (ss, in_line, '\t')) )
+        {
+            if (col == 1) {
+                vertebraePoints.push_back(in_line);
+            }
+          col ++;
+        }
+    }
+}
 // //____________________________________________________________________
 // void ScCalc::makeData(Double_t* x, Double_t& d, Double_t& e)
 // {

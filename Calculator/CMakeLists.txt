@@ -25,7 +25,7 @@ endif()
 #include(${ROOT_USE_FILE})
 #include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 #include_directories(${ROOT_INCLUDE_DIRS})
-include_directories("/usr/local/include")
+include_directories("/usr/local/gsl/install/include")
 
 file( GLOB LIB_SOURCES lib/*.cpp )
 file( GLOB LIB_HEADERS lib/*.h )

@@ -33,6 +33,7 @@ struct SpineComponent {
   int index1;
   int index2;
   double angle;
+  int apex;
 };
 
 //Spine Curvature Calculator
@@ -45,12 +46,27 @@ public:
     std::vector<std::vector<int> > spine1vec;
     double (*spine1)[3];
     double (*fit1)[3];
+    double (*fit2)[3];
     unsigned spine1Length;
     double* spacing1;
     double* angles1;
+    double* angles2;
+    std::vector<SpineComponent> compX;
+    std::vector<SpineComponent> compY;
+    std::vector<double> kappaX;
+    std::vector<double> kappaY;
+    std::vector<double>  kappa;
+    std::vector<double> caX;
+    std::vector<double> caY;
+    std::vector<double> maxAnglesX;
+    std::vector<double> maxAnglesY;
+    std::vector<std::vector<int>> colorMap;
+    std::vector<std::string> vertebraePoints;
+    std::string curveType;
+    std::string sagittalModifier;
+    std::string lumbarModifier;
 
     // TRandom* gRandom;
-    void getGeometricCurvature(double points[][3], unsigned spLength, unsigned order, double *xStore, double *yStore, double *dz);
     void printVector(std::vector<std::vector<int> > vec);
     void saveVector(std::vector<std::vector<int> > vec, char* fileName);
     std::vector<std::vector<int> > loadVector(char* fileName);
@@ -87,8 +103,19 @@ public:
 
     // added this
     std::vector<std::vector<int>> loadAnnotationData(char* fileName);
+    void loadColorMap(char* fileName);
     std::vector<SpineComponent> getMax3DanglesMod(double points[][3], double angles[], int npoints);
-    void analyze3DAngles(std::vector<SpineComponent> comp);
+    void analyze3DAngles(std::vector<SpineComponent> comp, int type);
+    void crateSpineFitX(int spineNum, unsigned order = 7);
+    void crateSpineFitY(int spineNum, unsigned order = 7);
+    double getCurvatureAngle(double x1, double y1, double z1, double x2, double y2, double z2, double kappa);
+    void getCurvatureAngleMod(double points[][3], unsigned spLength, unsigned order, double *xStore, double *yStore, double *dz, int type);
+    void doLenkeClassification(std::vector<SpineComponent> comp, std::vector<SpineComponent> results);
+    void doLenkeClassificationReloaded(std::vector<SpineComponent> comp, std::vector<SpineComponent> results, int type);
+    void doSimpleClassification(std::vector<SpineComponent> comp, std::vector<SpineComponent> results);
+    void computeGeometricCurvature2D(double points[][3], unsigned spLength, unsigned order, double *xStore, double *x);
+    void getGeometricCurvature(double points[][3], unsigned spLength, unsigned order, double *xStore, double *yStore, double *dz);
+    void getGeometricCurvatureMod(double points[][3], unsigned spLength, unsigned order, double *xStore, double *yStore, double *dz, int type);
 };
 
 #endif
